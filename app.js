@@ -121,6 +121,30 @@ $('managerResetForm').addEventListener('submit',async e=>{
  }catch(err){showMessage('managerResetMessage','تعذر حفظ كلمة المرور: '+(err.message||'حاول مرة أخرى.'),'err');}
  finally{btn.disabled=false;btn.textContent='حفظ كلمة المرور';}
 });
+// تغيير كلمة مرور المدير من داخل لوحة الإدارة بعد إعادة التحقق بكلمة المرور الحالية.
+$('managerChangePasswordForm').addEventListener('submit',async e=>{
+ e.preventDefault();
+ const current=$('managerCurrentPassword').value;
+ const next=$('managerChangeNewPassword').value;
+ const confirm=$('managerChangeConfirmPassword').value;
+ const btn=$('managerChangePasswordBtn');
+ if(next.length<8){showMessage('managerChangePasswordMessage','كلمة المرور الجديدة يجب ألا تقل عن 8 أحرف.','err');return;}
+ if(next!==confirm){showMessage('managerChangePasswordMessage','تأكيد كلمة المرور الجديدة غير مطابق.','err');return;}
+ if(current===next){showMessage('managerChangePasswordMessage','اختر كلمة مرور مختلفة عن الحالية.','err');return;}
+ btn.disabled=true;btn.textContent='جارٍ تغيير كلمة المرور...';
+ try{
+  const email='abdallahradwan1992@gmail.com';
+  const {data:{user},error:userError}=await db.auth.getUser();
+  if(userError||!user||user.email?.toLowerCase()!==email)throw new Error('يجب تسجيل الدخول بحساب المدير الأساسي لتغيير كلمة المرور.');
+  const {error:verifyError}=await db.auth.signInWithPassword({email,password:current});
+  if(verifyError)throw new Error('كلمة المرور الحالية غير صحيحة.');
+  const {error:updateError}=await db.auth.updateUser({password:next});
+  if(updateError)throw updateError;
+  $('managerChangePasswordForm').reset();
+  showMessage('managerChangePasswordMessage','تم تغيير كلمة المرور بنجاح. استخدم كلمة المرور الجديدة في تسجيل الدخول القادم.','ok');
+ }catch(err){showMessage('managerChangePasswordMessage','تعذر تغيير كلمة المرور: '+(err.message||'حاول مرة أخرى.'),'err');}
+ finally{btn.disabled=false;btn.textContent='حفظ كلمة المرور الجديدة';}
+});
 $('managerLoginBtn').addEventListener('click',async()=>{
  const btn=$('managerLoginBtn');btn.disabled=true;
  try{const role=await login($('managerEmail').value,$('managerPassword').value,'managerMessage');if(role!=='admin'){await logout();throw new Error('الحساب ليس حساب مدير.');}$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');await loadManagerOrders();showMessage('managerMessage','تم تسجيل الدخول بنجاح.');await loadManagerApplications();}
