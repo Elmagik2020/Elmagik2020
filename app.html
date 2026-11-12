@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#031b3b">
+<meta name="description" content="تطبيق ELmagik Cool لطلب خدمات الصيانة والحجز المسبق.">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./assets/app-icon.svg" type="image/svg+xml">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>تطبيق ELmagik Cool | طلب الصيانة</title>
+<style>
+:root{--bg:#031b3b;--panel:#062957;--panel2:#08396c;--cyan:#08c9f2;--blue:#087be8;--text:#f4fbff;--muted:#bed6eb;--line:#126eaa;--green:#08b96f;--gold:#ffc928}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% 0,#0a3970 0,transparent 38%),linear-gradient(145deg,#02152f,#052b59 58%,#031a39);font-family:Tajawal,Arial,sans-serif;color:var(--text);min-height:100vh}button,input,select,textarea{font:inherit}a{color:inherit;text-decoration:none}.wrap{width:min(980px,94%);margin:auto}.top{padding:14px 0;border-bottom:1px solid #0b75b7;background:#031b3be8;position:sticky;top:0;z-index:4;backdrop-filter:blur(12px)}.topin{display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:900}.logo{width:42px;height:42px;border:2px solid var(--cyan);border-radius:13px;display:grid;place-items:center;color:var(--cyan);font-size:23px}.brand small{display:block;color:var(--muted);font-size:10px}.toplinks{display:flex;gap:8px;flex-wrap:wrap}.btn{border:0;border-radius:12px;padding:11px 15px;background:linear-gradient(100deg,var(--cyan),var(--blue));color:#001a36;font-weight:900;cursor:pointer;display:inline-flex;justify-content:center;align-items:center;gap:7px}.btn.alt{background:#092f5b;border:1px solid var(--line);color:white}.btn.green{background:var(--green);color:white}.btn:disabled{opacity:.55;cursor:not-allowed}.hero{padding:26px 0 18px;text-align:center}.eyebrow{color:#a9edff;background:#06447a;border:1px solid #0799db;border-radius:30px;padding:6px 13px;display:inline-block;font-size:12px;font-weight:800}.hero h1{font-size:clamp(27px,5vw,40px);margin:13px 0 7px}.hero h1 span{color:var(--cyan)}.hero p{color:var(--muted);line-height:1.8;margin:0 auto;max-width:660px}.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:15px 0}.tab{border:1px solid var(--line);background:#05264c;color:#d8efff;border-radius:12px;padding:12px 7px;font-weight:800;cursor:pointer}.tab.active{background:linear-gradient(100deg,#087be8,#08c9f2);color:#001a36;border-color:transparent}.panel{background:linear-gradient(145deg,#07366b,#041d40);border:1px solid #087fc2;border-radius:18px;padding:18px;box-shadow:0 12px 30px #00122c66;margin:12px 0 22px}.panel h2{font-size:21px;margin:0 0 5px}.sub{color:var(--muted);font-size:13px;line-height:1.7;margin:0 0 15px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field label{display:block;color:#c9e4f8;font-size:13px;margin:0 0 6px;font-weight:700}.field input,.field select,.field textarea{width:100%;padding:12px;border-radius:10px;border:1px solid #3379a8;background:#031a39;color:white;outline:none}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--cyan);box-shadow:0 0 0 2px #08c9f222}.field textarea{resize:vertical;min-height:90px}.wide{grid-column:1/-1}.choice{display:grid;grid-template-columns:1fr 1fr;gap:9px}.choice label{border:1px solid var(--line);background:#031a39;border-radius:11px;padding:11px;display:flex;gap:8px;align-items:center;cursor:pointer}.choice input{accent-color:var(--cyan)}.submit{width:100%;margin-top:14px;padding:14px}.notice{padding:12px;border-radius:11px;margin:12px 0;line-height:1.7;font-size:14px}.notice.ok{background:#06472f;border:1px solid #08b96f}.notice.err{background:#4b1c27;border:1px solid #d64c65}.hide{display:none!important}.muted{color:var(--muted)}.order-card{background:#031a39;border:1px solid #126eaa;border-radius:13px;padding:13px;margin:10px 0}.order-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}.pill{display:inline-block;padding:5px 9px;border-radius:20px;background:#0b4775;color:#d8f5ff;font-size:12px}.order-card p{margin:7px 0;color:#d6e9f8;line-height:1.6;font-size:14px}.order-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.footer{text-align:center;color:#9ebbd4;font-size:12px;padding:8px 0 25px}.loader{opacity:.7}.small{font-size:12px;color:#b8d5ec;line-height:1.7}
+@media(max-width:600px){.brand{font-size:17px}.toplinks .btn{padding:9px;font-size:12px}.grid{grid-template-columns:1fr}.wide{grid-column:auto}.panel{padding:14px}.tabs{gap:5px}.tab{font-size:12px;padding:11px 4px}.hero{padding-top:20px}.order-actions{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap topin">
+<a class="brand" href="./index.html"><span class="logo">❄</span><span>ELmagik Cool<small>منصة طلب خدمات الصيانة</small></span></a>
+<div class="toplinks"><a class="btn alt" href="./index.html">الموقع الرئيسي</a><a class="btn green" href="https://wa.me/201092909037">واتساب</a></div>
+</div></header>
+<main class="wrap">
+<section class="hero"><span class="eyebrow">خدمة فنية عند طلبك</span><h1>الصيانة أصبحت <span>أسهل وأسرع</span></h1><p>اطلب فنيًا الآن أو احجز موعدًا يناسبك. اختر نوع الخدمة وأرسل بياناتك، وسيتواصل معك فريق ELmagik Cool لتأكيد الطلب.</p></section>
+<nav class="tabs" aria-label="أقسام التطبيق">
+<button class="tab active" data-view="customer">طلب خدمة</button>
+<button class="tab" data-view="technician">دخول الفني</button>
+<button class="tab" data-view="manager">الإدارة</button>
+</nav>
+<section id="customerView" class="panel">
+<h2>طلب صيانة جديد</h2><p class="sub">الحقول المميزة مطلوبة. الأسعار وتأكيد الموعد يتم تحديدهما من إدارة الشركة بعد مراجعة الطلب.</p>
+<form id="orderForm">
+<div class="grid">
+<div class="field"><label for="customerName">الاسم بالكامل *</label><input id="customerName" maxlength="100" required autocomplete="name" placeholder="اسم العميل"></div>
+<div class="field"><label for="customerPhone">رقم الموبايل *</label><input id="customerPhone" type="tel" maxlength="30" required autocomplete="tel" placeholder="01xxxxxxxxx"></div>
+<div class="field"><label for="category">مجال الخدمة *</label><select id="category" required><option value="">اختر المجال</option><option>التكييف والتبريد</option><option>الأجهزة المنزلية</option><option>المصانع والأنظمة الصناعية</option><option>الكهرباء والكنترول</option><option>خدمات الورش والمعدات</option></select></div>
+<div class="field"><label for="serviceName">نوع الخدمة المطلوبة *</label><select id="serviceName" required disabled><option value="">اختر مجال الخدمة أولًا</option></select></div>
+<div class="field wide"><label>نوع الطلب *</label><div class="choice"><label><input type="radio" name="requestType" value="immediate" checked> طلب فوري – في أقرب وقت</label><label><input type="radio" name="requestType" value="scheduled"> حجز موعد مسبق</label></div></div>
+<div id="scheduleFields" class="field wide hide"><div class="grid"><div class="field"><label for="scheduleDate">تاريخ الموعد *</label><input id="scheduleDate" type="date"></div><div class="field"><label for="scheduleTime">الوقت المناسب *</label><input id="scheduleTime" type="time"></div></div></div>
+<div class="field wide"><label for="address">العنوان بالتفصيل *</label><input id="address" maxlength="300" required autocomplete="street-address" placeholder="المنطقة والشارع ورقم العقار"></div>
+<div class="field wide"><label for="details">وصف العطل أو تفاصيل إضافية</label><textarea id="details" maxlength="2000" placeholder="اكتب وصف العطل أو موديل الجهاز إن أمكن..."></textarea></div>
+</div>
+<button class="btn submit" id="submitOrder" type="submit">إرسال طلب الصيانة <span>←</span></button>
+<div id="orderMessage" aria-live="polite"></div>
+</form>
+</section>
+<section id="technicianView" class="panel hide">
+<h2>بوابة الفنيين</h2><p class="sub">سجّل الدخول بالبريد وكلمة المرور المخصصين لك لعرض الطلبات المسندة إليك فقط.</p>
+<div id="techLogin" class="grid">
+<div class="field"><label for="techEmail">البريد الإلكتروني</label><input id="techEmail" type="email" autocomplete="username"></div>
+<div class="field"><label for="techPassword">كلمة المرور</label><input id="techPassword" type="password" autocomplete="current-password"></div>
+<div class="wide"><button class="btn" id="techLoginBtn">دخول الفني</button></div>
+</div>
+<div id="techDashboard" class="hide"><div class="order-head"><b>الطلبات المسندة إليك</b><button class="btn alt" id="techLogout">تسجيل الخروج</button></div><div id="techOrders"></div></div>
+<div id="techMessage" class="small" aria-live="polite"></div>
+</section>
+<section id="managerView" class="panel hide">
+<h2>لوحة إدارة الطلبات</h2><p class="sub">دخول المدير بنفس حساب إدارة الموقع. يمكنك مراجعة الطلبات وتحديد السعر والفني المسؤول.</p>
+<div id="managerLogin" class="grid">
+<div class="field"><label for="managerEmail">البريد الإلكتروني</label><input id="managerEmail" type="email" autocomplete="username"></div>
+<div class="field"><label for="managerPassword">كلمة المرور</label><input id="managerPassword" type="password" autocomplete="current-password"></div>
+<div class="wide"><button class="btn" id="managerLoginBtn">دخول الإدارة</button></div>
+</div>
+<div id="managerDashboard" class="hide"><div class="order-head"><b>جميع طلبات الصيانة</b><button class="btn alt" id="managerLogout">تسجيل الخروج</button></div><div id="managerOrders"></div></div>
+<div id="managerMessage" class="small" aria-live="polite"></div>
+</section>
+<footer class="footer">© ELmagik Cool – حلول التبريد والصيانة والأجهزة المنزلية</footer>
+</main>
+<script type="module" src="./app.js"></script>
+</body></html>
