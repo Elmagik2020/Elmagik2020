@@ -39,7 +39,7 @@
 <div class="field"><label for="serviceName">نوع الخدمة المطلوبة *</label><select id="serviceName" required disabled><option value="">اختر مجال الخدمة أولًا</option></select></div>
 <div class="field wide"><label>نوع الطلب *</label><div class="choice"><label><input type="radio" name="requestType" value="immediate" checked> طلب فوري – في أقرب وقت</label><label><input type="radio" name="requestType" value="scheduled"> حجز موعد مسبق</label></div></div>
 <div id="scheduleFields" class="field wide hide"><div class="grid"><div class="field"><label for="scheduleDate">تاريخ الموعد *</label><input id="scheduleDate" type="date"></div><div class="field"><label for="scheduleTime">الوقت المناسب *</label><input id="scheduleTime" type="time"></div></div></div>
-<div class="field wide"><label for="address">العنوان بالتفصيل *</label><input id="address" maxlength="300" required autocomplete="street-address" placeholder="المنطقة والشارع ورقم العقار"></div>
+<div class="field wide"><label for="address">العنوان بالتفصيل *</label><input id="address" minlength="5" maxlength="300" required autocomplete="street-address" placeholder="المنطقة والشارع ورقم العقار"></div>
 <div class="field wide"><label for="details">وصف العطل أو تفاصيل إضافية</label><textarea id="details" maxlength="2000" placeholder="اكتب وصف العطل أو موديل الجهاز إن أمكن..."></textarea></div>
 </div>
 <button class="btn submit" id="submitOrder" type="submit">إرسال طلب الصيانة <span>←</span></button>
