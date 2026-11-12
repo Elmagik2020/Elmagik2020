@@ -40,6 +40,7 @@
 <div class="field wide"><label>نوع الطلب *</label><div class="choice"><label><input type="radio" name="requestType" value="immediate" checked> طلب فوري – في أقرب وقت</label><label><input type="radio" name="requestType" value="scheduled"> حجز موعد مسبق</label></div></div>
 <div id="scheduleFields" class="field wide hide"><div class="grid"><div class="field"><label for="scheduleDate">تاريخ الموعد *</label><input id="scheduleDate" type="date"></div><div class="field"><label for="scheduleTime">الوقت المناسب *</label><input id="scheduleTime" type="time"></div></div></div>
 <div class="field wide"><label for="address">العنوان بالتفصيل *</label><input id="address" minlength="5" maxlength="300" required autocomplete="street-address" placeholder="المنطقة والشارع ورقم العقار"></div>
+<div class="field wide"><label for="paymentMethod">طريقة الدفع المفضلة</label><select id="paymentMethod"><option value="cash">نقدًا بعد تنفيذ الخدمة</option><option value="instapay">إنستا باي</option><option value="vodafone_cash">فودافون كاش</option></select><small class="small">سيتم إرسال بيانات التحويل بعد تأكيد السعر من الإدارة.</small></div>
 <div class="field wide"><label for="details">وصف العطل أو تفاصيل إضافية</label><textarea id="details" maxlength="2000" placeholder="اكتب وصف العطل أو موديل الجهاز إن أمكن..."></textarea></div>
 </div>
 <button class="btn submit" id="submitOrder" type="submit">إرسال طلب الصيانة <span>←</span></button>
@@ -91,6 +92,7 @@
 <div class="field wide"><label for="joinSpecialties">التخصصات التي تعمل بها * (يمكن اختيار أكثر من تخصص بالضغط المطوّل)</label><select id="joinSpecialties" multiple required>
 <option>التكييف والتبريد</option><option>التكييف المركزي و VRV / VRF</option><option>الثلاجات والفريزرات</option><option>الغسالات والأجهزة المنزلية</option><option>الكهرباء والكنترول</option><option>لف المحركات الكهربائية</option><option>الكباسات وغرف التبريد</option><option>معدات ومصانع الثلج</option><option>الصيانة الصناعية</option><option>السخانات والبوتاجاز</option>
 </select></div>
+<div class="field"><label for="joinIdFront">صورة البطاقة – الوجه الأمامي *</label><input id="joinIdFront" type="file" accept="image/jpeg,image/png,image/webp" required><small class="small">صورة واضحة، بحد أقصى 5 ميجابايت.</small></div><div class="field"><label for="joinIdBack">صورة البطاقة – الوجه الخلفي *</label><input id="joinIdBack" type="file" accept="image/jpeg,image/png,image/webp" required><small class="small">صورة واضحة، بحد أقصى 5 ميجابايت.</small></div><div class="field wide"><label><input id="joinIdConsent" type="checkbox" required> أوافق على استخدام صور البطاقة للتحقق من الهوية ومراجعة طلب الانضمام، مع حفظها في مساحة خاصة لا يطلع عليها إلا الإدارة المصرح لها.</label></div>
 <div class="field wide"><label for="joinNotes">نبذة عن خبرتك أو شهاداتك (اختياري)</label><textarea id="joinNotes" maxlength="1500" placeholder="اكتب خبراتك السابقة وأهم الأعمال التي تجيدها..."></textarea></div>
 </div>
 <button class="btn submit" id="joinSubmit" type="submit">إرسال طلب الانضمام</button>
