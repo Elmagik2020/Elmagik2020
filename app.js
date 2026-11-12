@@ -163,8 +163,11 @@ $('techLoginBtn').addEventListener('click',async()=>{
 });
 async function loadManagerOrders(){
  const root=$('managerOrders');root.innerHTML='<p class="loader">جارٍ تحميل الطلبات...</p>';
- const [{data,error},t]=await Promise.all([db.from('service_orders').select('*').order('created_at',{ascending:false}).limit(100),db.from('technicians').select('user_id,display_name,active').eq('active',true).order('display_name')]);
- if(error){root.textContent='تعذر تحميل الطلبات: '+error.message;return;}technicians=t||[];
+ const [ordersResult,techniciansResult]=await Promise.all([db.from('service_orders').select('*').order('created_at',{ascending:false}).limit(100),db.from('technicians').select('user_id,display_name,active').eq('active',true).order('display_name')]);
+ const {data,error}=ordersResult;
+ if(error){root.textContent='تعذر تحميل الطلبات: '+error.message;return;}
+ if(techniciansResult.error){technicians=[];showMessage('managerMessage','تعذر تحميل قائمة الفنيين: '+techniciansResult.error.message,'err');}
+ else{technicians=Array.isArray(techniciansResult.data)?techniciansResult.data:[];}
  if(!data?.length){root.textContent='لا توجد طلبات حتى الآن.';return;}
  root.innerHTML=data.map(o=>managerCard(o)).join('');
  root.querySelectorAll('[data-save-order]').forEach(b=>b.addEventListener('click',()=>saveManagerOrder(b.dataset.saveOrder)));
