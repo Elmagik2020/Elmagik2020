@@ -99,6 +99,7 @@ $('managerForgotBtn').addEventListener('click',async()=>{
 });
 db.auth.onAuthStateChange((event,session)=>{
  if(event==='PASSWORD_RECOVERY'&&session?.user?.email?.toLowerCase()==='abdallahradwan1992@gmail.com'){
+  setView('manager');
   $('managerResetPanel').classList.remove('hide');
   $('managerLogin').classList.add('hide');
   showMessage('managerResetMessage','تم التحقق من رابط الاستعادة. أدخل كلمة مرور جديدة لا تقل عن 8 أحرف.','ok');
