@@ -47,6 +47,8 @@ jobs:
       - name: Install ELmagik Cool launcher icons
         run: |
           cp -R assets/android-icons/. android/app/src/main/res/
+          # Force Android to use the generated density PNG icons, not the older adaptive vector artwork.
+          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
           python3 -m pip install --break-system-packages pillow
           python3 scripts/generate-android-icons.py
 
