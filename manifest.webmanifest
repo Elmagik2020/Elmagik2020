@@ -1,0 +1,16 @@
+{
+  "id": "./app.html",
+  "name": "ELmagik Cool",
+  "short_name": "ELmagik Cool",
+  "description": "منصة طلب خدمات الصيانة والحجز المسبق",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./app.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#031b3b",
+  "theme_color": "#031b3b",
+  "icons": [
+    { "src": "./assets/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
