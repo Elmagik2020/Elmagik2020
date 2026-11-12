@@ -1,4 +1,4 @@
-name: Build ELmagik Cool APK
+name: Build ELmagik Cool APK (debug)
 
 on:
   workflow_dispatch:
