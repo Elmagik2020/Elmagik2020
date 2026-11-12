@@ -86,6 +86,41 @@ async function login(email,password,messageId){
  if(tech?.active){activeRole='technician';return 'technician';}
  await db.auth.signOut();activeUser=null;activeRole=null;throw new Error('هذا الحساب غير مسجل كمدير أو فني معتمد.');
 }
+// استعادة/إنشاء كلمة مرور حساب المدير الأساسي عبر رابط آمن على البريد المسجل.
+$('managerForgotBtn').addEventListener('click',async()=>{
+ const btn=$('managerForgotBtn');btn.disabled=true;btn.textContent='جارٍ إرسال الرابط...';
+ try{
+  const email='abdallahradwan1992@gmail.com';
+  const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:'https://elmagikcool.vercel.app/app.html'});
+  if(error)throw error;
+  showMessage('managerMessage','تم طلب رابط إنشاء كلمة مرور جديدة. افحص صندوق الوارد والرسائل غير المرغوب فيها للبريد '+email+'. افتح الرابط من نفس الجهاز لإكمال تعيين كلمة المرور.','ok');
+ }catch(err){showMessage('managerMessage','تعذر إرسال رابط الاستعادة: '+(err.message||'حاول لاحقًا. إذا ظهر حدّ الإرسال، انتظر قليلًا قبل إعادة المحاولة.'),'err');}
+ finally{btn.disabled=false;btn.textContent='إنشاء / استعادة كلمة المرور';}
+});
+db.auth.onAuthStateChange((event,session)=>{
+ if(event==='PASSWORD_RECOVERY'&&session?.user?.email?.toLowerCase()==='abdallahradwan1992@gmail.com'){
+  $('managerResetPanel').classList.remove('hide');
+  $('managerLogin').classList.add('hide');
+  showMessage('managerResetMessage','تم التحقق من رابط الاستعادة. أدخل كلمة مرور جديدة لا تقل عن 8 أحرف.','ok');
+ }
+});
+$('managerResetForm').addEventListener('submit',async e=>{
+ e.preventDefault();
+ const password=$('managerNewPassword').value,confirm=$('managerConfirmPassword').value,btn=$('managerSavePasswordBtn');
+ if(password.length<8){showMessage('managerResetMessage','كلمة المرور يجب ألا تقل عن 8 أحرف.','err');return;}
+ if(password!==confirm){showMessage('managerResetMessage','تأكيد كلمة المرور غير مطابق.','err');return;}
+ btn.disabled=true;btn.textContent='جارٍ حفظ كلمة المرور...';
+ try{
+  const {data:{user},error}=await db.auth.getUser();
+  if(error||!user||user.email?.toLowerCase()!=='abdallahradwan1992@gmail.com')throw new Error('رابط الاستعادة غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا.');
+  const {error:updateError}=await db.auth.updateUser({password});
+  if(updateError)throw updateError;
+  await db.auth.signOut();
+  $('managerResetForm').reset();$('managerResetPanel').classList.add('hide');$('managerLogin').classList.remove('hide');
+  showMessage('managerMessage','تم حفظ كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول إلى إعدادات الإدارة بالبريد المحدد وكلمة المرور الجديدة.','ok');
+ }catch(err){showMessage('managerResetMessage','تعذر حفظ كلمة المرور: '+(err.message||'حاول مرة أخرى.'),'err');}
+ finally{btn.disabled=false;btn.textContent='حفظ كلمة المرور';}
+});
 $('managerLoginBtn').addEventListener('click',async()=>{
  const btn=$('managerLoginBtn');btn.disabled=true;
  try{const role=await login($('managerEmail').value,$('managerPassword').value,'managerMessage');if(role!=='admin'){await logout();throw new Error('الحساب ليس حساب مدير.');}$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');await loadManagerOrders();showMessage('managerMessage','تم تسجيل الدخول بنجاح.');await loadManagerApplications();}
