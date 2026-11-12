@@ -1,0 +1,15 @@
+{
+  "appId": "com.elmagikcool.app",
+  "appName": "ELmagik Cool",
+  "webDir": "www",
+  "server": {
+    "url": "https://elmagikcool.vercel.app/app.html",
+    "cleartext": false,
+    "allowNavigation": [
+      "elmagikcool.vercel.app"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
