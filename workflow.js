@@ -207,12 +207,35 @@ async function setManagerStatus(id,status) {
   await loadWorkflowOrders();
 }
 async function openManagerChat(id,code) {
+  const box=$('managerChatBox'), root=$('managerChatMessages');
+  if(!box||!root) { alert('لوحة المحادثة غير موجودة. حدّث الصفحة وسجّل دخول المدير مرة أخرى.'); return; }
+  box.classList.remove('hide');
+  $('managerChatTitle').textContent='محادثة الطلب '+code;
+  root.textContent='جارٍ فتح المحادثة والتحقق من صلاحية المدير...';
   currentChatOrder={id,code,role:'admin'};
-  $('managerChatBox').classList.remove('hide');$('managerChatTitle').textContent='محادثة الطلب '+code;
-  await refreshManagerMessages();closeChannel();
-  chatChannel=supabase.channel('admin-order-chat-'+id)
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'order_messages',filter:'order_id=eq.'+id},payload=>appendManagerMessage(payload.new))
-    .subscribe();
+  try {
+    const {data:{user},error:userError}=await supabase.auth.getUser();
+    if(userError) throw userError;
+    if(!user) throw new Error('جلسة المدير انتهت. سجّل الدخول مرة أخرى.');
+    const {data:admin,error:adminError}=await supabase.from('admins').select('user_id').eq('user_id',user.id).maybeSingle();
+    if(adminError) throw adminError;
+    if(!admin) throw new Error('الحساب الحالي لا يملك صلاحية المدير.');
+    await refreshManagerMessages();
+    closeChannel();
+    chatChannel=supabase.channel('admin-order-chat-'+id)
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'order_messages',filter:'order_id=eq.'+id},payload=>appendManagerMessage(payload.new))
+      .subscribe((status)=>{
+        if(status==='CHANNEL_ERROR'||status==='TIMED_OUT') {
+          const hint=document.createElement('p');
+          hint.className='wf-meta';
+          hint.textContent='تعذر الاتصال الفوري؛ يمكنك إعادة فتح المحادثة لتحديث الرسائل.';
+          root.appendChild(hint);
+        }
+      });
+  } catch(err) {
+    console.error('ELmagik manager chat open failed:',err);
+    root.textContent='تعذر فتح المحادثة: '+(err?.message||'خطأ غير معروف')+' — جرّب تسجيل الخروج من لوحة المدير ثم الدخول مرة أخرى.';
+  }
 }
 function appendManagerMessage(m) {
   const root=$('managerChatMessages');if(!root||root.querySelector('[data-message-id="'+m.id+'"]'))return;
@@ -221,10 +244,14 @@ function appendManagerMessage(m) {
   root.appendChild(item);root.scrollTop=root.scrollHeight;
 }
 async function refreshManagerMessages() {
-  $('managerChatMessages').innerHTML='<p class="small">جارٍ تحميل المحادثة...</p>';
-  const {data,error}=await supabase.from('order_messages').select('*').eq('order_id',currentChatOrder.id).order('created_at',{ascending:true});
-  if(error){$('managerChatMessages').textContent='تعذر تحميل المحادثة: '+error.message;return;}
-  $('managerChatMessages').innerHTML='';(data||[]).forEach(appendManagerMessage);
+  const root=$('managerChatMessages');
+  if(!root||!currentChatOrder?.id) throw new Error('لم يتم تحديد الطلب المطلوب فتح محادثته.');
+  root.textContent='جارٍ تحميل الرسائل...';
+  const {data,error}=await supabase.from('order_messages').select('id,order_id,sender_id,sender_role,body,created_at').eq('order_id',currentChatOrder.id).order('created_at',{ascending:true});
+  if(error) throw error;
+  root.innerHTML='';
+  if(!data?.length) { root.textContent='لا توجد رسائل في هذه المحادثة حتى الآن. يمكنك إرسال أول رد للعميل.'; return; }
+  data.forEach(appendManagerMessage);
 }
 async function sendAdminMessage(e) {
   e.preventDefault();if(!currentChatOrder)return;
