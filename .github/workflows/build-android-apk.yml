@@ -8,6 +8,7 @@ on:
       - 'package.json'
       - 'capacitor.config.json'
       - 'assets/android-icons/**'
+      - 'scripts/generate-android-icons.py'
       - '.github/workflows/build-android-apk.yml'
 
 permissions:
@@ -37,8 +38,17 @@ jobs:
       - name: Generate Android project
         run: npx cap add android
 
+      - name: Restore persistent Android debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: elmagik-android-debug-signing-key-v1
+
       - name: Install ELmagik Cool launcher icons
-        run: cp -R assets/android-icons/. android/app/src/main/res/
+        run: |
+          cp -R assets/android-icons/. android/app/src/main/res/
+          python3 -m pip install --break-system-packages pillow
+          python3 scripts/generate-android-icons.py
 
       - name: Build debug APK
         working-directory: android
