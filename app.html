@@ -59,9 +59,19 @@
 <section id="managerView" class="panel hide">
 <h2>لوحة إدارة الطلبات</h2><p class="sub">دخول المدير بنفس حساب إدارة الموقع. يمكنك مراجعة الطلبات وتحديد السعر والفني المسؤول.</p>
 <div id="managerLogin" class="grid">
-<div class="field"><label for="managerEmail">البريد الإلكتروني</label><input id="managerEmail" type="email" autocomplete="username"></div>
+<div class="field"><label for="managerEmail">البريد الإلكتروني</label><input id="managerEmail" type="email" value="abdallahradwan1992@gmail.com" readonly autocomplete="username"></div>
 <div class="field"><label for="managerPassword">كلمة المرور</label><input id="managerPassword" type="password" autocomplete="current-password"></div>
-<div class="wide"><button class="btn" id="managerLoginBtn">دخول الإدارة</button></div>
+<div class="wide"><button class="btn" id="managerLoginBtn">دخول الإدارة</button> <button class="btn alt" type="button" id="managerForgotBtn">إنشاء / استعادة كلمة المرور</button></div>
+</div>
+<div id="managerResetPanel" class="panel hide" style="margin-top:14px">
+<h2>إنشاء كلمة مرور جديدة</h2>
+<p class="sub">افتح رابط الاستعادة الذي وصلك على بريد الإدارة، ثم اكتب كلمة المرور الجديدة هنا.</p>
+<form id="managerResetForm" class="grid">
+<div class="field"><label for="managerNewPassword">كلمة المرور الجديدة</label><input id="managerNewPassword" type="password" minlength="8" required autocomplete="new-password"></div>
+<div class="field"><label for="managerConfirmPassword">تأكيد كلمة المرور</label><input id="managerConfirmPassword" type="password" minlength="8" required autocomplete="new-password"></div>
+<div class="wide"><button class="btn" id="managerSavePasswordBtn" type="submit">حفظ كلمة المرور</button></div>
+</form>
+<div id="managerResetMessage" class="small" aria-live="polite"></div>
 </div>
 <div id="managerDashboard" class="hide"><div class="order-head"><b>جميع طلبات الصيانة</b><button class="btn alt" id="managerLogout">تسجيل الخروج</button></div><div id="managerOrders"></div><h2 style="margin-top:22px">طلبات انضمام الفنيين</h2><p class="sub">راجع بيانات المتقدمين، ثم وافق لتفعيل حساب الفني أو ارفض الطلب.</p><div id="managerApplications"></div></div>
 <div id="managerMessage" class="small" aria-live="polite"></div>
