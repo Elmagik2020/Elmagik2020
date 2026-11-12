@@ -39,7 +39,7 @@ $('orderForm').addEventListener('submit',async e=>{
    scheduled_for=local.toISOString();
   }
   const display_code=code();
-  const payload={display_code,customer_name:$('customerName').value.trim(),customer_phone:$('customerPhone').value.trim(),category:$('category').value,service_name:$('serviceName').value,request_type:type,scheduled_for,address,details:$('details').value.trim()||null,status:'new'};
+  const payload={display_code,customer_name:$('customerName').value.trim(),customer_phone:$('customerPhone').value.trim(),category:$('category').value,service_name:$('serviceName').value,request_type:type,scheduled_for,address,details:$('details').value.trim()||null,payment_method:$('paymentMethod').value,status:'new'};
   const {error}=await db.from('service_orders').insert(payload);
   if(error)throw error;
   $('orderForm').reset();$('serviceName').innerHTML='<option value="">اختر مجال الخدمة أولًا</option>';$('serviceName').disabled=true;$('scheduleFields').classList.add('hide');$('scheduleDate').required=false;$('scheduleTime').required=false;
@@ -53,6 +53,11 @@ $('technicianApplicationForm').addEventListener('submit',async e=>{
   const email=$('joinEmail').value.trim().toLowerCase(),password=$('joinPassword').value;
   const specialties=Array.from($('joinSpecialties').selectedOptions).map(o=>o.value);
   if(!specialties.length)throw new Error('اختر تخصصًا واحدًا على الأقل.');
+  const idFront=$('joinIdFront').files[0],idBack=$('joinIdBack').files[0];
+  if(!idFront||!idBack)throw new Error('ارفع صورة الوجه الأمامي والخلفي للبطاقة.');
+  if(!$('joinIdConsent').checked)throw new Error('يجب الموافقة على استخدام صور البطاقة للتحقق من الهوية.');
+  const allowed=['image/jpeg','image/png','image/webp'];
+  for(const f of [idFront,idBack]){if(!allowed.includes(f.type))throw new Error('صور البطاقة يجب أن تكون JPG أو PNG أو WEBP.');if(f.size>5*1024*1024)throw new Error('حجم كل صورة يجب ألا يتجاوز 5 ميجابايت.');}
   const experience=Number($('joinExperience').value);
   if(!Number.isInteger(experience)||experience<0||experience>60)throw new Error('أدخل عدد سنوات خبرة صحيحًا.');
   let {data:{session}}=await db.auth.getSession();
@@ -70,9 +75,17 @@ $('technicianApplicationForm').addEventListener('submit',async e=>{
   if(!session?.user?.id)throw new Error('تعذر تأكيد حسابك. سجّل الدخول بعد تأكيد البريد الإلكتروني ثم أعد إرسال الطلب.');
   const {data:existing}=await db.from('technician_applications').select('status').eq('user_id',session.user.id).maybeSingle();
   if(existing){await db.auth.signOut();showMessage('joinMessage',existing.status==='pending'?'طلبك موجود بالفعل وهو بانتظار مراجعة الإدارة.':existing.status==='approved'?'تم قبول طلبك بالفعل. استخدم بوابة دخول الفني.':'سبق مراجعة طلبك. تواصل مع الإدارة إذا أردت إعادة التقديم.','ok');return;}
-  const payload={user_id:session.user.id,display_name:$('joinName').value.trim(),email,phone:$('joinPhone').value.trim(),governorate:$('joinGovernorate').value.trim(),area:$('joinArea').value.trim(),specialties,years_experience:experience,notes:$('joinNotes').value.trim()||null,status:'pending'};
+  const bucket=db.storage.from('technician-id-documents');
+  const ext=f=>f.type==='image/jpeg'?'jpg':f.type==='image/png'?'png':'webp';
+  const idFrontPath=session.user.id+'/front-'+Date.now()+'.'+ext(idFront);
+  const idBackPath=session.user.id+'/back-'+Date.now()+'.'+ext(idBack);
+  const upFront=await bucket.upload(idFrontPath,idFront,{contentType:idFront.type,upsert:false});
+  if(upFront.error)throw new Error('تعذر رفع الوجه الأمامي للبطاقة: '+upFront.error.message);
+  const upBack=await bucket.upload(idBackPath,idBack,{contentType:idBack.type,upsert:false});
+  if(upBack.error){await bucket.remove([idFrontPath]);throw new Error('تعذر رفع الوجه الخلفي للبطاقة: '+upBack.error.message);}
+  const payload={user_id:session.user.id,display_name:$('joinName').value.trim(),email,phone:$('joinPhone').value.trim(),governorate:$('joinGovernorate').value.trim(),area:$('joinArea').value.trim(),specialties,years_experience:experience,notes:$('joinNotes').value.trim()||null,id_front_path:idFrontPath,id_back_path:idBackPath,status:'pending'};
   const {error}=await db.from('technician_applications').insert(payload);
-  if(error)throw error;
+  if(error){await bucket.remove([idFrontPath,idBackPath]);throw error;}
   await db.auth.signOut();
   $('technicianApplicationForm').reset();
   showMessage('joinMessage','وصل طلب انضمامك بنجاح. حسابك الآن بانتظار مراجعة الإدارة، ولن تتمكن من استقبال الطلبات إلا بعد الموافقة.','ok');
@@ -198,7 +211,14 @@ async function loadManagerApplications(){
  const {data,error}=await db.from('technician_applications').select('*').order('created_at',{ascending:false}).limit(100);
  if(error){root.textContent='تعذر تحميل طلبات الفنيين: '+error.message;return;}
  if(!data?.length){root.textContent='لا توجد طلبات انضمام حاليًا.';return;}
- root.innerHTML=data.map(a=>'<article class="order-card"><div class="order-head"><b>'+esc(a.display_name)+'</b><span class="pill">'+(a.status==='pending'?'بانتظار المراجعة':a.status==='approved'?'تم القبول':'مرفوض')+'</span></div><p>البريد: '+esc(a.email)+'<br>الهاتف: '+esc(a.phone)+'<br>المحافظة: '+esc(a.governorate)+' – '+esc(a.area)+'</p><p>الخبرة: '+esc(a.years_experience)+' سنة<br>التخصصات: '+esc((a.specialties||[]).join('، '))+'</p><p>نبذة: '+esc(a.notes||'لا توجد نبذة')+'</p>'+(a.status==='pending'?'<div class="order-actions"><button class="btn green" data-approve-tech="'+esc(a.id)+'">قبول وتفعيل الفني</button><button class="btn alt" data-reject-tech="'+esc(a.id)+'">رفض الطلب</button></div>':'')+'</article>').join('');
+ const bucket=db.storage.from('technician-id-documents');
+ const cards=await Promise.all(data.map(async a=>{
+  let frontUrl=null,backUrl=null;
+  if(a.id_front_path){const r=await bucket.createSignedUrl(a.id_front_path,60);if(!r.error)frontUrl=r.data.signedUrl;}
+  if(a.id_back_path){const r=await bucket.createSignedUrl(a.id_back_path,60);if(!r.error)backUrl=r.data.signedUrl;}
+  return '<article class="order-card"><div class="order-head"><b>'+esc(a.display_name)+'</b><span class="pill">'+(a.status==='pending'?'بانتظار المراجعة':a.status==='approved'?'تم القبول':'مرفوض')+'</span></div><p>البريد: '+esc(a.email)+'<br>الهاتف: '+esc(a.phone)+'<br>المحافظة: '+esc(a.governorate)+' – '+esc(a.area)+'</p><p>الخبرة: '+esc(a.years_experience)+' سنة<br>التخصصات: '+esc((a.specialties||[]).join('، '))+'</p><p>نبذة: '+esc(a.notes||'لا توجد نبذة')+'</p>'+'<p>صور البطاقة: '+(frontUrl?'<a href="'+esc(frontUrl)+'" target="_blank" rel="noopener">الوجه الأمامي</a>':'غير مرفوع')+' · '+(backUrl?'<a href="'+esc(backUrl)+'" target="_blank" rel="noopener">الوجه الخلفي</a>':'غير مرفوع')+'</p>'+(a.status==='pending'?'<div class="order-actions"><button class="btn green" data-approve-tech="'+esc(a.id)+'">قبول وتفعيل الفني</button><button class="btn alt" data-reject-tech="'+esc(a.id)+'">رفض الطلب</button></div>':'')+'</article>';
+ })).join('');
+ root.innerHTML=cards;
  root.querySelectorAll('[data-approve-tech]').forEach(b=>b.addEventListener('click',()=>reviewTechnicianApplication(b.dataset.approveTech,'approved')));
  root.querySelectorAll('[data-reject-tech]').forEach(b=>b.addEventListener('click',()=>reviewTechnicianApplication(b.dataset.rejectTech,'rejected')));
 }
@@ -218,7 +238,7 @@ async function reviewTechnicianApplication(id,decision){
 function managerCard(o){
  const safeTechnicians=Array.isArray(technicians)?technicians:[];
  const opts=safeTechnicians.map(t=>'<option value="'+esc(t.user_id)+'" '+(t.user_id===o.assigned_technician?'selected':'')+'>'+esc(t.display_name)+'</option>').join('');
- return '<article class="order-card"><div class="order-head"><b>'+esc(o.display_code)+' · '+esc(o.customer_name)+'</b><span class="pill">'+esc(statusNames[o.status]||o.status)+'</span></div><p>'+esc(o.category)+' — '+esc(o.service_name)+'</p><p>الهاتف: '+esc(o.customer_phone)+'<br>العنوان: '+esc(o.address)+'</p><p>نوع الطلب: '+(o.request_type==='immediate'?'فوري':'حجز مسبق')+(o.scheduled_for?' · '+esc(new Date(o.scheduled_for).toLocaleString('ar-EG')):'')+'</p><p>التفاصيل: '+esc(o.details||'لا توجد تفاصيل إضافية')+'</p><div class="order-actions"><div class="field"><label>الفني المسؤول</label><select id="tech-'+esc(o.id)+'"><option value="">لم يتم التعيين</option>'+opts+'</select></div><div class="field"><label>السعر (جنيه)</label><input id="price-'+esc(o.id)+'" type="number" min="0" step="0.01" value="'+(o.quoted_price??'')+'" placeholder="يحدد بواسطة الإدارة"></div><div class="field"><label>حالة الطلب</label><select id="status-'+esc(o.id)+'">'+Object.entries(statusNames).map(([k,v])=>'<option value="'+k+'" '+(o.status===k?'selected':'')+'>'+v+'</option>').join('')+'</select></div><div class="field"><label>ملاحظة الإدارة</label><input id="note-'+esc(o.id)+'" maxlength="1000" value="'+esc(o.admin_note||'')+'"></div></div><button class="btn submit" data-save-order="'+esc(o.id)+'">حفظ وتحديث الطلب</button></article>';
+ return '<article class="order-card"><div class="order-head"><b>'+esc(o.display_code)+' · '+esc(o.customer_name)+'</b><span class="pill">'+esc(statusNames[o.status]||o.status)+'</span></div><p>'+esc(o.category)+' — '+esc(o.service_name)+'</p><p>طريقة الدفع: '+esc(({cash:'نقدًا',instapay:'إنستا باي',vodafone_cash:'فودافون كاش'})[o.payment_method]||'غير محددة')+'</p><p>الهاتف: '+esc(o.customer_phone)+'<br>العنوان: '+esc(o.address)+'</p><p>نوع الطلب: '+(o.request_type==='immediate'?'فوري':'حجز مسبق')+(o.scheduled_for?' · '+esc(new Date(o.scheduled_for).toLocaleString('ar-EG')):'')+'</p><p>التفاصيل: '+esc(o.details||'لا توجد تفاصيل إضافية')+'</p><div class="order-actions"><div class="field"><label>الفني المسؤول</label><select id="tech-'+esc(o.id)+'"><option value="">لم يتم التعيين</option>'+opts+'</select></div><div class="field"><label>السعر (جنيه)</label><input id="price-'+esc(o.id)+'" type="number" min="0" step="0.01" value="'+(o.quoted_price??'')+'" placeholder="يحدد بواسطة الإدارة"></div><div class="field"><label>حالة الطلب</label><select id="status-'+esc(o.id)+'">'+Object.entries(statusNames).map(([k,v])=>'<option value="'+k+'" '+(o.status===k?'selected':'')+'>'+v+'</option>').join('')+'</select></div><div class="field"><label>ملاحظة الإدارة</label><input id="note-'+esc(o.id)+'" maxlength="1000" value="'+esc(o.admin_note||'')+'"></div></div><button class="btn submit" data-save-order="'+esc(o.id)+'">حفظ وتحديث الطلب</button></article>';
 }
 async function saveManagerOrder(id){
  const assigned=$('tech-'+id).value||null;const status=$('status-'+id).value;const raw=$('price-'+id).value;const quoted_price=raw===''?null:Number(raw);const admin_note=$('note-'+id).value.trim()||null;
