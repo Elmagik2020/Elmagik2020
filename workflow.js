@@ -1,9 +1,9 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-const supabase = createClient(
-  'https://ehswwhonicinexutzruo.supabase.co',
+const supabase = window.__elmagikSupabase || createClient(
+  'https://ehswwwhonicinexutzruo.supabase.co',
   'sb_publishable_bTedgB2z-k0bFylHHRucTw_1nE6eESZ',
-  { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'elmagik-cool-auth' } }
+  { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'elmagik-cool-auth-workflow-fallback' } }
 );
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -258,4 +258,5 @@ function boot() {
   if(dashboard) new MutationObserver(()=>{if(!dashboard.classList.contains('hide'))detectAdminSession();}).observe(dashboard,{attributes:true,attributeFilter:['class','childList']});
   supabase.auth.onAuthStateChange(()=>{setTimeout(()=>{detectAdminSession();restoreCustomerSession();},0);});
 }
+window.__elmagikRefreshWorkflow = detectAdminSession;
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
