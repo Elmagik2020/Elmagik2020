@@ -56,13 +56,13 @@ async function login(email,password,messageId){
 }
 $('managerLoginBtn').addEventListener('click',async()=>{
  const btn=$('managerLoginBtn');btn.disabled=true;
- try{const role=await login($('managerEmail').value,$('managerPassword').value,'managerMessage');if(role!=='admin')throw new Error('الحساب ليس حساب مدير.');$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');await loadManagerOrders();showMessage('managerMessage','تم تسجيل الدخول بنجاح.');}
+ try{const role=await login($('managerEmail').value,$('managerPassword').value,'managerMessage');if(role!=='admin'){await logout();throw new Error('الحساب ليس حساب مدير.');}$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');await loadManagerOrders();showMessage('managerMessage','تم تسجيل الدخول بنجاح.');}
  catch(err){showMessage('managerMessage',err.message,'err');}
  finally{btn.disabled=false;}
 });
 $('techLoginBtn').addEventListener('click',async()=>{
  const btn=$('techLoginBtn');btn.disabled=true;
- try{const role=await login($('techEmail').value,$('techPassword').value,'techMessage');if(role!=='technician')throw new Error('الحساب ليس حساب فني.');$('techLogin').classList.add('hide');$('techDashboard').classList.remove('hide');await loadTechOrders();showMessage('techMessage','تم تسجيل الدخول بنجاح.');}
+ try{const role=await login($('techEmail').value,$('techPassword').value,'techMessage');if(role!=='technician'){await logout();throw new Error('الحساب ليس حساب فني.');}$('techLogin').classList.add('hide');$('techDashboard').classList.remove('hide');await loadTechOrders();showMessage('techMessage','تم تسجيل الدخول بنجاح.');}
  catch(err){showMessage('techMessage',err.message,'err');}
  finally{btn.disabled=false;}
 });
@@ -81,7 +81,7 @@ function managerCard(o){
 async function saveManagerOrder(id){
  const assigned=$('tech-'+id).value||null;const status=$('status-'+id).value;const raw=$('price-'+id).value;const quoted_price=raw===''?null:Number(raw);const admin_note=$('note-'+id).value.trim()||null;
  if(quoted_price!==null&&(!Number.isFinite(quoted_price)||quoted_price<0)){showMessage('managerMessage','أدخل سعرًا صحيحًا.','err');return;}
- const patch={assigned_technician:assigned,status,quoted_price,admin_note};
+ let finalStatus=status;if(assigned&&finalStatus==='new')finalStatus='assigned';if(!assigned&&finalStatus==='assigned')finalStatus='new';const patch={assigned_technician:assigned,status:finalStatus,quoted_price,admin_note};
  const {error}=await db.from('service_orders').update(patch).eq('id',id);
  if(error){showMessage('managerMessage','تعذر حفظ الطلب: '+error.message,'err');return;}
  showMessage('managerMessage','تم تحديث الطلب بنجاح.');await loadManagerOrders();
@@ -91,7 +91,7 @@ async function loadTechOrders(){
  const {data,error}=await db.from('service_orders').select('*').eq('assigned_technician',activeUser.id).order('created_at',{ascending:false});
  if(error){root.textContent='تعذر تحميل الطلبات: '+error.message;return;}
  if(!data?.length){root.textContent='لا توجد طلبات مسندة إليك حاليًا.';return;}
- root.innerHTML=data.map(o=>'<article class="order-card"><div class="order-head"><b>'+esc(o.display_code)+' · '+esc(o.service_name)+'</b><span class="pill">'+esc(statusNames[o.status]||o.status)+'</span></div><p>العميل: '+esc(o.customer_name)+' · '+esc(o.customer_phone)+'</p><p>العنوان: '+esc(o.address)+'</p><p>التفاصيل: '+esc(o.details||'لا توجد تفاصيل إضافية')+'</p><div class="order-actions"><div class="field"><label>تحديث الحالة</label><select id="tech-status-'+esc(o.id)+'"><option value="accepted">قبول الطلب</option><option value="in_progress" '+(o.status==='in_progress'?'selected':'')+'>جارٍ التنفيذ</option><option value="completed" '+(o.status==='completed'?'selected':'')+'>تم الإنجاز</option></select></div><div class="field"><label>ملاحظات الفني</label><input id="tech-note-'+esc(o.id)+'" maxlength="1000" value="'+esc(o.technician_note||'')+'"></div></div><button class="btn submit" data-tech-save="'+esc(o.id)+'">تحديث الحالة</button></article>').join('');
+ root.innerHTML=data.map(o=>{const options=o.status==='assigned'?'<option value="accepted">قبول الطلب</option><option value="in_progress">بدء التنفيذ</option>':o.status==='accepted'?'<option value="in_progress">بدء التنفيذ</option><option value="completed">تم الإنجاز</option>':o.status==='in_progress'?'<option value="completed">تم الإنجاز</option>':'';return '<article class="order-card"><div class="order-head"><b>'+esc(o.display_code)+' · '+esc(o.service_name)+'</b><span class="pill">'+esc(statusNames[o.status]||o.status)+'</span></div><p>العميل: '+esc(o.customer_name)+' · '+esc(o.customer_phone)+'</p><p>العنوان: '+esc(o.address)+'</p><p>التفاصيل: '+esc(o.details||'لا توجد تفاصيل إضافية')+'</p>'+ (options?'<div class="order-actions"><div class="field"><label>تحديث الحالة</label><select id="tech-status-'+esc(o.id)+'">'+options+'</select></div><div class="field"><label>ملاحظات الفني</label><input id="tech-note-'+esc(o.id)+'" maxlength="1000" value="'+esc(o.technician_note||'')+'"></div></div><button class="btn submit" data-tech-save="'+esc(o.id)+'">تحديث الحالة</button>':'<p class="pill">لا توجد إجراءات متاحة لهذا الطلب</p>')+'</article>';}).join('');
  root.querySelectorAll('[data-tech-save]').forEach(b=>b.addEventListener('click',()=>saveTechOrder(b.dataset.techSave)));
 }
 async function saveTechOrder(id){
