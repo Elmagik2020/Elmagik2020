@@ -2,6 +2,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const SUPABASE_URL='https://ehswwhonicinexutzruo.supabase.co';
 const SUPABASE_KEY='sb_publishable_bTedgB2z-k0bFylHHRucTw_1nE6eESZ';
 const db=createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'elmagik-cool-auth'}});
+window.__elmagikSupabase=db;
 const $=id=>document.getElementById(id);
 const catalog={
  'التكييف والتبريد':['صيانة وتركيب التكييف المنزلي','صيانة التكييف المركزي والدكت','صيانة أنظمة VRV / VRF','غرف التبريد والتجميد','الثلاجات التجارية والفريزرات','سيارات النقل المبردة','مصانع الثلج ومعدات التبريد'],
@@ -171,7 +172,7 @@ async function restoreSavedSession(){
   const {data:admin,error:adminError}=await db.from('admins').select('user_id').eq('user_id',activeUser.id).maybeSingle();
   if(!adminError&&admin){
    activeRole='admin';$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');
-   await loadManagerOrders();await loadManagerApplications();showMessage('managerMessage','تم استعادة جلسة الإدارة المحفوظة على هذا الجهاز.');
+   await loadManagerOrders();await loadManagerApplications();if(window.__elmagikRefreshWorkflow)await window.__elmagikRefreshWorkflow();showMessage('managerMessage','تم استعادة جلسة الإدارة المحفوظة على هذا الجهاز.');
    return;
   }
   const {data:tech,error:techError}=await db.from('technicians').select('user_id,display_name,active').eq('user_id',activeUser.id).maybeSingle();
@@ -185,7 +186,7 @@ async function restoreSavedSession(){
 }
 $('managerLoginBtn').addEventListener('click',async()=>{
  const btn=$('managerLoginBtn');btn.disabled=true;
- try{const role=await login($('managerEmail').value,$('managerPassword').value,'managerMessage');if(role!=='admin'){await logout();throw new Error('الحساب ليس حساب مدير.');}$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');await loadManagerOrders();showMessage('managerMessage','تم تسجيل الدخول بنجاح.');await loadManagerApplications();}
+ try{const role=await login($('managerEmail').value,$('managerPassword').value,'managerMessage');if(role!=='admin'){await logout();throw new Error('الحساب ليس حساب مدير.');}$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');await loadManagerOrders();showMessage('managerMessage','تم تسجيل الدخول بنجاح.');await loadManagerApplications();if(window.__elmagikRefreshWorkflow)await window.__elmagikRefreshWorkflow();}
  catch(err){showMessage('managerMessage',err.message,'err');}
  finally{btn.disabled=false;}
 });
