@@ -7,6 +7,7 @@ on:
     paths:
       - 'package.json'
       - 'capacitor.config.json'
+      - 'assets/android-icons/**'
       - '.github/workflows/build-android-apk.yml'
 
 permissions:
@@ -35,6 +36,9 @@ jobs:
 
       - name: Generate Android project
         run: npx cap add android
+
+      - name: Install ELmagik Cool launcher icons
+        run: cp -R assets/android-icons/. android/app/src/main/res/
 
       - name: Build debug APK
         working-directory: android
