@@ -27,6 +27,9 @@ document.querySelectorAll('input[name="requestType"]').forEach(x=>x.addEventList
 $('orderForm').addEventListener('submit',async e=>{
  e.preventDefault();const btn=$('submitOrder');btn.disabled=true;btn.textContent='جارٍ إرسال الطلب...';
  try{
+  const address=$('address').value.trim();
+  if(address.length<5)throw new Error('من فضلك أدخل عنوانًا تفصيليًا لا يقل عن 5 أحرف.');
+  if(address.length>300)throw new Error('العنوان طويل جدًا. الحد الأقصى 300 حرف.');
   const type=selectedType();let scheduled_for=null;
   if(type==='scheduled'){
    const date=$('scheduleDate').value,time=$('scheduleTime').value;
@@ -36,7 +39,7 @@ $('orderForm').addEventListener('submit',async e=>{
    scheduled_for=local.toISOString();
   }
   const display_code=code();
-  const payload={display_code,customer_name:$('customerName').value.trim(),customer_phone:$('customerPhone').value.trim(),category:$('category').value,service_name:$('serviceName').value,request_type:type,scheduled_for,address:$('address').value.trim(),details:$('details').value.trim()||null,status:'new'};
+  const payload={display_code,customer_name:$('customerName').value.trim(),customer_phone:$('customerPhone').value.trim(),category:$('category').value,service_name:$('serviceName').value,request_type:type,scheduled_for,address,details:$('details').value.trim()||null,status:'new'};
   const {error}=await db.from('service_orders').insert(payload);
   if(error)throw error;
   $('orderForm').reset();$('serviceName').innerHTML='<option value="">اختر مجال الخدمة أولًا</option>';$('serviceName').disabled=true;$('scheduleFields').classList.add('hide');$('scheduleDate').required=false;$('scheduleTime').required=false;
