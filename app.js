@@ -16,7 +16,7 @@ function showMessage(id,msg,type=''){const el=$(id);el.className=type?'notice '+
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function code(){return 'EM-'+Array.from(crypto.getRandomValues(new Uint8Array(4))).map(x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();}
 function selectedType(){return document.querySelector('input[name="requestType"]:checked')?.value||'immediate';}
-function setView(name){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.view===name));['customer','technician','manager'].forEach(v=>$(v+'View').classList.toggle('hide',v!==name));}
+function setView(name){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.view===name));['customer','technician','manager','join'].forEach(v=>$(v+'View').classList.toggle('hide',v!==name));}
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
 $('category').addEventListener('change',()=>{
  const list=catalog[$('category').value]||[];const select=$('serviceName');select.innerHTML='<option value="">اختر نوع الخدمة</option>'+list.map(x=>'<option>'+esc(x)+'</option>').join('');select.disabled=!list.length;
@@ -44,6 +44,38 @@ $('orderForm').addEventListener('submit',async e=>{
  }catch(err){showMessage('orderMessage','لم نتمكن من إرسال الطلب: '+(err.message||'تحقق من الاتصال وحاول مرة أخرى.'),'err');}
  finally{btn.disabled=false;btn.innerHTML='إرسال طلب الصيانة ←';}
 });
+$('technicianApplicationForm').addEventListener('submit',async e=>{
+ e.preventDefault();const btn=$('joinSubmit');btn.disabled=true;btn.textContent='جارٍ إرسال الطلب...';
+ try{
+  const email=$('joinEmail').value.trim().toLowerCase(),password=$('joinPassword').value;
+  const specialties=Array.from($('joinSpecialties').selectedOptions).map(o=>o.value);
+  if(!specialties.length)throw new Error('اختر تخصصًا واحدًا على الأقل.');
+  const experience=Number($('joinExperience').value);
+  if(!Number.isInteger(experience)||experience<0||experience>60)throw new Error('أدخل عدد سنوات خبرة صحيحًا.');
+  let {data:{session}}=await db.auth.getSession();
+  if(!session){
+   const signup=await db.auth.signUp({email,password,options:{data:{display_name:$('joinName').value.trim()}}});
+   if(signup.error){
+    const login=await db.auth.signInWithPassword({email,password});
+    if(login.error)throw new Error(signup.error.message.includes('already registered')?'هذا البريد مسجل بالفعل. استخدم بيانات الدخول الصحيحة لإرسال طلبك.':signup.error.message);
+    session=login.data.session;
+   }else if(!signup.data.session){
+    showMessage('joinMessage','تم إنشاء حساب الدخول. افتح رسالة تأكيد البريد الإلكتروني أولًا، ثم ارجع إلى هذه الصفحة وسجّل بنفس البريد وكلمة المرور واضغط إرسال طلب الانضمام مرة أخرى. لم يتم تفعيل أي صلاحيات فني حتى الآن.','ok');
+    return;
+   }else session=signup.data.session;
+  }
+  if(!session?.user?.id)throw new Error('تعذر تأكيد حسابك. سجّل الدخول بعد تأكيد البريد الإلكتروني ثم أعد إرسال الطلب.');
+  const {data:existing}=await db.from('technician_applications').select('status').eq('user_id',session.user.id).maybeSingle();
+  if(existing){await db.auth.signOut();showMessage('joinMessage',existing.status==='pending'?'طلبك موجود بالفعل وهو بانتظار مراجعة الإدارة.':existing.status==='approved'?'تم قبول طلبك بالفعل. استخدم بوابة دخول الفني.':'سبق مراجعة طلبك. تواصل مع الإدارة إذا أردت إعادة التقديم.','ok');return;}
+  const payload={user_id:session.user.id,display_name:$('joinName').value.trim(),email,phone:$('joinPhone').value.trim(),governorate:$('joinGovernorate').value.trim(),area:$('joinArea').value.trim(),specialties,years_experience:experience,notes:$('joinNotes').value.trim()||null,status:'pending'};
+  const {error}=await db.from('technician_applications').insert(payload);
+  if(error)throw error;
+  await db.auth.signOut();
+  $('technicianApplicationForm').reset();
+  showMessage('joinMessage','وصل طلب انضمامك بنجاح. حسابك الآن بانتظار مراجعة الإدارة، ولن تتمكن من استقبال الطلبات إلا بعد الموافقة.','ok');
+ }catch(err){showMessage('joinMessage','تعذر إرسال الطلب: '+(err.message||'حاول مرة أخرى.'),'err');}
+ finally{btn.disabled=false;btn.textContent='إرسال طلب الانضمام';}
+});
 async function login(email,password,messageId){
  const {data,error}=await db.auth.signInWithPassword({email:email.trim(),password});
  if(error)throw new Error('بيانات الدخول غير صحيحة أو الحساب غير مفعل.');
@@ -56,7 +88,7 @@ async function login(email,password,messageId){
 }
 $('managerLoginBtn').addEventListener('click',async()=>{
  const btn=$('managerLoginBtn');btn.disabled=true;
- try{const role=await login($('managerEmail').value,$('managerPassword').value,'managerMessage');if(role!=='admin'){await logout();throw new Error('الحساب ليس حساب مدير.');}$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');await loadManagerOrders();showMessage('managerMessage','تم تسجيل الدخول بنجاح.');}
+ try{const role=await login($('managerEmail').value,$('managerPassword').value,'managerMessage');if(role!=='admin'){await logout();throw new Error('الحساب ليس حساب مدير.');}$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');await loadManagerOrders();showMessage('managerMessage','تم تسجيل الدخول بنجاح.');await loadManagerApplications();}
  catch(err){showMessage('managerMessage',err.message,'err');}
  finally{btn.disabled=false;}
 });
@@ -73,6 +105,28 @@ async function loadManagerOrders(){
  if(!data?.length){root.textContent='لا توجد طلبات حتى الآن.';return;}
  root.innerHTML=data.map(o=>managerCard(o)).join('');
  root.querySelectorAll('[data-save-order]').forEach(b=>b.addEventListener('click',()=>saveManagerOrder(b.dataset.saveOrder)));
+}
+async function loadManagerApplications(){
+ const root=$('managerApplications');if(!root)return;root.innerHTML='<p class="loader">جارٍ تحميل طلبات الانضمام...</p>';
+ const {data,error}=await db.from('technician_applications').select('*').order('created_at',{ascending:false}).limit(100);
+ if(error){root.textContent='تعذر تحميل طلبات الفنيين: '+error.message;return;}
+ if(!data?.length){root.textContent='لا توجد طلبات انضمام حاليًا.';return;}
+ root.innerHTML=data.map(a=>'<article class="order-card"><div class="order-head"><b>'+esc(a.display_name)+'</b><span class="pill">'+(a.status==='pending'?'بانتظار المراجعة':a.status==='approved'?'تم القبول':'مرفوض')+'</span></div><p>البريد: '+esc(a.email)+'<br>الهاتف: '+esc(a.phone)+'<br>المحافظة: '+esc(a.governorate)+' – '+esc(a.area)+'</p><p>الخبرة: '+esc(a.years_experience)+' سنة<br>التخصصات: '+esc((a.specialties||[]).join('، '))+'</p><p>نبذة: '+esc(a.notes||'لا توجد نبذة')+'</p>'+(a.status==='pending'?'<div class="order-actions"><button class="btn green" data-approve-tech="'+esc(a.id)+'">قبول وتفعيل الفني</button><button class="btn alt" data-reject-tech="'+esc(a.id)+'">رفض الطلب</button></div>':'')+'</article>').join('');
+ root.querySelectorAll('[data-approve-tech]').forEach(b=>b.addEventListener('click',()=>reviewTechnicianApplication(b.dataset.approveTech,'approved')));
+ root.querySelectorAll('[data-reject-tech]').forEach(b=>b.addEventListener('click',()=>reviewTechnicianApplication(b.dataset.rejectTech,'rejected')));
+}
+async function reviewTechnicianApplication(id,decision){
+ const {data:app,error:readError}=await db.from('technician_applications').select('*').eq('id',id).single();
+ if(readError||!app){showMessage('managerMessage','تعذر العثور على طلب الفني.','err');return;}
+ if(app.status!=='pending'){showMessage('managerMessage','تمت مراجعة هذا الطلب من قبل.','err');return;}
+ if(decision==='approved'){
+  const {error}=await db.from('technicians').upsert({user_id:app.user_id,display_name:app.display_name,phone:app.phone,active:true},{onConflict:'user_id'});
+  if(error){showMessage('managerMessage','تعذر تفعيل الفني: '+error.message,'err');return;}
+ }
+ const {error:updateError}=await db.from('technician_applications').update({status:decision,reviewed_at:new Date().toISOString()}).eq('id',id).eq('status','pending');
+ if(updateError){showMessage('managerMessage','تم تجهيز حساب الفني لكن تعذر تحديث حالة الطلب: '+updateError.message,'err');return;}
+ showMessage('managerMessage',decision==='approved'?'تم قبول الفني وتفعيل حسابه، ويمكنه الآن تسجيل الدخول.':'تم رفض طلب الانضمام.');
+ await loadManagerApplications();
 }
 function managerCard(o){
  const opts=technicians.map(t=>'<option value="'+esc(t.user_id)+'" '+(t.user_id===o.assigned_technician?'selected':'')+'>'+esc(t.display_name)+'</option>').join('');
