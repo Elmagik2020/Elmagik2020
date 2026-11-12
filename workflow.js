@@ -246,7 +246,7 @@ async function restoreCustomerSession() {
   if (!phone) return;
   const {data:admin} = await supabase.from('admins').select('user_id').eq('user_id',session.user.id).maybeSingle();
   if (admin) return;
-  $('customerOtpPhone').value = phone.replace(/^\\+20/, '0');
+  $('customerOtpPhone').value = phone.replace(/^\+20/, '0');
   try { await loadCustomerOrders(); }
   catch (e) { note('customerOtpMessage','تعذر استعادة طلباتك: '+(e.message||'يرجى تسجيل الدخول مرة أخرى.'),'err'); }
 }
