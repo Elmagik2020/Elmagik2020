@@ -19,6 +19,7 @@ function note(id, text, kind='') {
 }
 function normalizeEgyptPhone(raw) {
   let n = String(raw || '').replace(/\D/g, '');
+  if (n.startsWith('0020')) n = n.slice(2);
   if (n.startsWith('0')) n = '20' + n.slice(1);
   if (!n.startsWith('20')) n = '20' + n;
   return '+' + n;
@@ -239,11 +240,22 @@ async function detectAdminSession() {
   const {data}=await supabase.from('admins').select('user_id').eq('user_id',session.user.id).maybeSingle();
   if(data){window.__elmagikWorkflowAdmin=true;injectManagerPanel();}
 }
+async function restoreCustomerSession() {
+  const {data:{session}} = await supabase.auth.getSession();
+  const phone = session?.user?.phone;
+  if (!phone) return;
+  const {data:admin} = await supabase.from('admins').select('user_id').eq('user_id',session.user.id).maybeSingle();
+  if (admin) return;
+  $('customerOtpPhone').value = phone.replace(/^\\+20/, '0');
+  try { await loadCustomerOrders(); }
+  catch (e) { note('customerOtpMessage','تعذر استعادة طلباتك: '+(e.message||'يرجى تسجيل الدخول مرة أخرى.'),'err'); }
+}
 function boot() {
   injectStyles(); injectCustomerPanel();
   detectAdminSession();
+  restoreCustomerSession();
   const dashboard=$('managerDashboard');
   if(dashboard) new MutationObserver(()=>{if(!dashboard.classList.contains('hide'))detectAdminSession();}).observe(dashboard,{attributes:true,attributeFilter:['class','childList']});
-  supabase.auth.onAuthStateChange(()=>{setTimeout(detectAdminSession,0);});
+  supabase.auth.onAuthStateChange(()=>{setTimeout(()=>{detectAdminSession();restoreCustomerSession();},0);});
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
