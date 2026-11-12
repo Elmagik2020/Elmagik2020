@@ -1,7 +1,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const SUPABASE_URL='https://ehswwhonicinexutzruo.supabase.co';
 const SUPABASE_KEY='sb_publishable_bTedgB2z-k0bFylHHRucTw_1nE6eESZ';
-const db=createClient(SUPABASE_URL,SUPABASE_KEY);
+const db=createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'elmagik-cool-auth'}});
 const $=id=>document.getElementById(id);
 const catalog={
  'التكييف والتبريد':['صيانة وتركيب التكييف المنزلي','صيانة التكييف المركزي والدكت','صيانة أنظمة VRV / VRF','غرف التبريد والتجميد','الثلاجات التجارية والفريزرات','سيارات النقل المبردة','مصانع الثلج ومعدات التبريد'],
@@ -149,6 +149,27 @@ $('managerChangePasswordForm').addEventListener('submit',async e=>{
  }catch(err){showMessage('managerChangePasswordMessage','تعذر تغيير كلمة المرور: '+(err.message||'حاول مرة أخرى.'),'err');}
  finally{btn.disabled=false;btn.textContent='حفظ كلمة المرور الجديدة';}
 });
+// استعادة جلسة المدير/الفني المحفوظة بأمان على نفس الجهاز دون تخزين كلمة المرور كنص.
+async function restoreSavedSession(){
+ try{
+  const {data:{session},error}=await db.auth.getSession();
+  if(error||!session?.user)return;
+  activeUser=session.user;
+  const {data:admin,error:adminError}=await db.from('admins').select('user_id').eq('user_id',activeUser.id).maybeSingle();
+  if(!adminError&&admin){
+   activeRole='admin';$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');
+   await loadManagerOrders();await loadManagerApplications();showMessage('managerMessage','تم استعادة جلسة الإدارة المحفوظة على هذا الجهاز.');
+   return;
+  }
+  const {data:tech,error:techError}=await db.from('technicians').select('user_id,display_name,active').eq('user_id',activeUser.id).maybeSingle();
+  if(!techError&&tech?.active){
+   activeRole='technician';$('techLogin').classList.add('hide');$('techDashboard').classList.remove('hide');
+   await loadTechOrders();showMessage('techMessage','تم استعادة جلسة الفني المحفوظة على هذا الجهاز.');
+   return;
+  }
+  activeUser=null;activeRole=null;
+ }catch(err){console.error('Session restore failed:',err);}
+}
 $('managerLoginBtn').addEventListener('click',async()=>{
  const btn=$('managerLoginBtn');btn.disabled=true;
  try{const role=await login($('managerEmail').value,$('managerPassword').value,'managerMessage');if(role!=='admin'){await logout();throw new Error('الحساب ليس حساب مدير.');}$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');await loadManagerOrders();showMessage('managerMessage','تم تسجيل الدخول بنجاح.');await loadManagerApplications();}
@@ -165,7 +186,7 @@ async function loadManagerOrders(){
  const root=$('managerOrders');root.innerHTML='<p class="loader">جارٍ تحميل الطلبات...</p>';
  const [ordersResult,techniciansResult]=await Promise.all([db.from('service_orders').select('*').order('created_at',{ascending:false}).limit(100),db.from('technicians').select('user_id,display_name,active').eq('active',true).order('display_name')]);
  const {data,error}=ordersResult;
- if(error){root.textContent='تعذر تحميل الطلبات: '+error.message;return;}
+ if(error){root.textContent='تعذر تحميل الطلبات: '+error.message;showMessage('managerMessage','فشل تحميل طلبات العملاء: '+error.message,'err');return;}
  if(techniciansResult.error){technicians=[];showMessage('managerMessage','تعذر تحميل قائمة الفنيين: '+techniciansResult.error.message,'err');}
  else{technicians=Array.isArray(techniciansResult.data)?techniciansResult.data:[];}
  if(!data?.length){root.textContent='لا توجد طلبات حتى الآن.';return;}
@@ -195,7 +216,8 @@ async function reviewTechnicianApplication(id,decision){
  await loadManagerApplications();
 }
 function managerCard(o){
- const opts=technicians.map(t=>'<option value="'+esc(t.user_id)+'" '+(t.user_id===o.assigned_technician?'selected':'')+'>'+esc(t.display_name)+'</option>').join('');
+ const safeTechnicians=Array.isArray(technicians)?technicians:[];
+ const opts=safeTechnicians.map(t=>'<option value="'+esc(t.user_id)+'" '+(t.user_id===o.assigned_technician?'selected':'')+'>'+esc(t.display_name)+'</option>').join('');
  return '<article class="order-card"><div class="order-head"><b>'+esc(o.display_code)+' · '+esc(o.customer_name)+'</b><span class="pill">'+esc(statusNames[o.status]||o.status)+'</span></div><p>'+esc(o.category)+' — '+esc(o.service_name)+'</p><p>الهاتف: '+esc(o.customer_phone)+'<br>العنوان: '+esc(o.address)+'</p><p>نوع الطلب: '+(o.request_type==='immediate'?'فوري':'حجز مسبق')+(o.scheduled_for?' · '+esc(new Date(o.scheduled_for).toLocaleString('ar-EG')):'')+'</p><p>التفاصيل: '+esc(o.details||'لا توجد تفاصيل إضافية')+'</p><div class="order-actions"><div class="field"><label>الفني المسؤول</label><select id="tech-'+esc(o.id)+'"><option value="">لم يتم التعيين</option>'+opts+'</select></div><div class="field"><label>السعر (جنيه)</label><input id="price-'+esc(o.id)+'" type="number" min="0" step="0.01" value="'+(o.quoted_price??'')+'" placeholder="يحدد بواسطة الإدارة"></div><div class="field"><label>حالة الطلب</label><select id="status-'+esc(o.id)+'">'+Object.entries(statusNames).map(([k,v])=>'<option value="'+k+'" '+(o.status===k?'selected':'')+'>'+v+'</option>').join('')+'</select></div><div class="field"><label>ملاحظة الإدارة</label><input id="note-'+esc(o.id)+'" maxlength="1000" value="'+esc(o.admin_note||'')+'"></div></div><button class="btn submit" data-save-order="'+esc(o.id)+'">حفظ وتحديث الطلب</button></article>';
 }
 async function saveManagerOrder(id){
@@ -226,4 +248,14 @@ async function logout(){
  $('techDashboard').classList.add('hide');$('techLogin').classList.remove('hide');$('techPassword').value='';
 }
 $('managerLogout').addEventListener('click',logout);$('techLogout').addEventListener('click',logout);
+restoreSavedSession();
+document.querySelectorAll('[data-manager-section]').forEach(button=>button.addEventListener('click',()=>{
+ const target=button.dataset.managerSection;
+ ['orders','applications','password'].forEach(name=>{
+  $('manager'+(name==='orders'?'Orders':name==='applications'?'Applications':'Password')+'Section').classList.toggle('hide',name!==target);
+  button.parentElement.querySelector('[data-manager-section="'+name+'"]').classList.toggle('alt',name!==target);
+ });
+ if(target==='orders')loadManagerOrders();
+ if(target==='applications')loadManagerApplications();
+}));
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
