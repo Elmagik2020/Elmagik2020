@@ -249,35 +249,83 @@ async function loadManagerOrders(){
  root.querySelectorAll('[data-chat-form]').forEach(form=>form.addEventListener('submit',e=>sendOrderChatMessage(e,form.dataset.chatForm)));
 }
 async function loadManagerApplications(){
- const root=$('managerApplications');if(!root)return;root.innerHTML='<p class="loader">جارٍ تحميل طلبات الانضمام...</p>';
- const {data,error}=await db.from('technician_applications').select('*').order('created_at',{ascending:false}).limit(100);
- if(error){root.textContent='تعذر تحميل طلبات الفنيين: '+error.message;return;}
- if(!data?.length){root.textContent='لا توجد طلبات انضمام حاليًا.';return;}
- const bucket=db.storage.from('technician-id-documents');
- const cards=await Promise.all(data.map(async a=>{
-  let frontUrl=null,backUrl=null,frontError=null,backError=null;
-  if(a.id_front_path){const r=await bucket.createSignedUrl(a.id_front_path,600);if(!r.error)frontUrl=r.data.signedUrl;else frontError=r.error.message;}
-  if(a.id_back_path){const r=await bucket.createSignedUrl(a.id_back_path,600);if(!r.error)backUrl=r.data.signedUrl;else backError=r.error.message;}
-  const frontView=frontUrl?'<a href="'+esc(frontUrl)+'" target="_blank" rel="noopener" title="فتح صورة الوجه الأمامي بالحجم الكامل"><img src="'+esc(frontUrl)+'" alt="صورة الوجه الأمامي للبطاقة" loading="lazy" style="display:block;width:150px;height:105px;object-fit:contain;background:#f3f4f6;border:1px solid #d1d5db;border-radius:10px;padding:4px"></a><a href="'+esc(frontUrl)+'" target="_blank" rel="noopener">فتح وتكبير الوجه الأمامي</a>':(a.id_front_path?'تعذر إنشاء رابط الصورة: '+esc(frontError||'تحقق من صلاحيات التخزين'):'لم يتم رفع الوجه الأمامي');
-  const backView=backUrl?'<a href="'+esc(backUrl)+'" target="_blank" rel="noopener" title="فتح صورة الوجه الخلفي بالحجم الكامل"><img src="'+esc(backUrl)+'" alt="صورة الوجه الخلفي للبطاقة" loading="lazy" style="display:block;width:150px;height:105px;object-fit:contain;background:#f3f4f6;border:1px solid #d1d5db;border-radius:10px;padding:4px"></a><a href="'+esc(backUrl)+'" target="_blank" rel="noopener">فتح وتكبير الوجه الخلفي</a>':(a.id_back_path?'تعذر إنشاء رابط الصورة: '+esc(backError||'تحقق من صلاحيات التخزين'):'لم يتم رفع الوجه الخلفي');
-  return '<article class="order-card"><div class="order-head"><b>'+esc(a.display_name)+'</b><span class="pill">'+(a.status==='pending'?'بانتظار المراجعة':a.status==='approved'?'تم القبول':'مرفوض')+'</span></div><p>البريد: '+esc(a.email)+'<br>الهاتف: '+esc(a.phone)+'<br>المحافظة: '+esc(a.governorate)+' – '+esc(a.area)+'</p><p>الخبرة: '+esc(a.years_experience)+' سنة<br>التخصصات: '+esc((a.specialties||[]).join('، '))+'</p><p>نبذة: '+esc(a.notes||'لا توجد نبذة')+'</p><div style="margin:12px 0"><b>صور بطاقة الرقم القومي</b><div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px"><div style="display:grid;gap:6px"><b>الوجه الأمامي</b>'+frontView+'</div><div style="display:grid;gap:6px"><b>الوجه الخلفي</b>'+backView+'</div></div></div>'+(a.status==='pending'?'<div class="order-actions"><button class="btn green" data-approve-tech="'+esc(a.id)+'">قبول وتفعيل الفني</button><button class="btn alt" data-reject-tech="'+esc(a.id)+'">رفض الطلب</button></div>':'')+'</article>';
- })).join('');
- root.innerHTML=cards;
- root.querySelectorAll('[data-approve-tech]').forEach(b=>b.addEventListener('click',()=>reviewTechnicianApplication(b.dataset.approveTech,'approved')));
- root.querySelectorAll('[data-reject-tech]').forEach(b=>b.addEventListener('click',()=>reviewTechnicianApplication(b.dataset.rejectTech,'rejected')));
-}
-async function reviewTechnicianApplication(id,decision){
- const {data:app,error:readError}=await db.from('technician_applications').select('*').eq('id',id).single();
- if(readError||!app){showMessage('managerMessage','تعذر العثور على طلب الفني.','err');return;}
- if(app.status!=='pending'){showMessage('managerMessage','تمت مراجعة هذا الطلب من قبل.','err');return;}
- if(decision==='approved'){
-  const {error}=await db.from('technicians').upsert({user_id:app.user_id,display_name:app.display_name,phone:app.phone,active:true},{onConflict:'user_id'});
-  if(error){showMessage('managerMessage','تعذر تفعيل الفني: '+error.message,'err');return;}
+ const root=$('managerApplications');if(!root)return;
+ root.innerHTML='<p class="loader">جارٍ تحميل طلبات الانضمام...</p>';
+ try{
+  const {data:{user},error:userError}=await db.auth.getUser();
+  if(userError)throw userError;
+  if(!user)throw new Error('جلسة الإدارة غير متصلة. سجّل الدخول مرة أخرى.');
+  const {data:admin,error:adminError}=await db.from('admins').select('user_id').eq('user_id',user.id).maybeSingle();
+  if(adminError)throw adminError;
+  if(!admin)throw new Error('الحساب الحالي غير مصرح له بمراجعة طلبات الفنيين.');
+  const {data,error}=await db.from('technician_applications').select('*').order('created_at',{ascending:false}).limit(100);
+  if(error)throw error;
+  if(!data?.length){root.textContent='لا توجد طلبات انضمام حاليًا.';return;}
+  const bucket=db.storage.from('technician-id-documents');
+  const cards=await Promise.all(data.map(async a=>{
+   let frontUrl=null,backUrl=null,frontError=null,backError=null;
+   if(a.id_front_path){
+    const r=await bucket.createSignedUrl(a.id_front_path,3600);
+    if(r.error)frontError=r.error.message;else frontUrl=r.data?.signedUrl||null;
+   }
+   if(a.id_back_path){
+    const r=await bucket.createSignedUrl(a.id_back_path,3600);
+    if(r.error)backError=r.error.message;else backUrl=r.data?.signedUrl||null;
+   }
+   const imageView=(url,path,error,side)=>{
+    if(!path)return '<p class="small">لم يتم رفع '+side+'</p>';
+    if(!url)return '<p class="notice err">تعذر تجهيز '+side+': '+esc(error||'لم يرجع التخزين رابط الصورة')+'</p>';
+    return '<a href="'+esc(url)+'" target="_blank" rel="noopener" title="فتح '+side+' بالحجم الكامل"><img data-id-document="'+side+'" src="'+esc(url)+'" alt="'+side+'" loading="eager" style="display:block;width:min(100%,260px);height:170px;object-fit:contain;background:#f3f4f6;border:1px solid #d1d5db;border-radius:10px;padding:4px"></a><a href="'+esc(url)+'" target="_blank" rel="noopener">فتح وتكبير '+side+'</a><small class="small" data-image-status="'+side+'"></small>';
+   };
+   return '<article class="order-card"><div class="order-head"><b>'+esc(a.display_name)+'</b><span class="pill">'+(a.status==='pending'?'بانتظار المراجعة':a.status==='approved'?'تم القبول':'مرفوض')+'</span></div><p>البريد: '+esc(a.email)+'<br>الهاتف: '+esc(a.phone)+'<br>المحافظة: '+esc(a.governorate)+' – '+esc(a.area)+'</p><p>الخبرة: '+esc(a.years_experience)+' سنة<br>التخصصات: '+esc((a.specialties||[]).join('، '))+'</p><p>نبذة: '+esc(a.notes||'لا توجد نبذة')+'</p><div style="margin:12px 0"><b>صور بطاقة الرقم القومي</b><div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px"><div style="display:grid;gap:6px;min-width:140px"><b>الوجه الأمامي</b>'+imageView(frontUrl,a.id_front_path,frontError,'الوجه الأمامي')+'</div><div style="display:grid;gap:6px;min-width:140px"><b>الوجه الخلفي</b>'+imageView(backUrl,a.id_back_path,backError,'الوجه الخلفي')+'</div></div></div>'+(a.status==='pending'?'<div class="order-actions"><button class="btn green" type="button" data-approve-tech="'+esc(a.id)+'">قبول وتفعيل الفني</button><button class="btn alt" type="button" data-reject-tech="'+esc(a.id)+'">رفض الطلب</button></div>':'')+'</article>';
+  })).join('');
+  root.innerHTML=cards;
+  root.querySelectorAll('img[data-id-document]').forEach(img=>img.addEventListener('error',()=>{
+   const status=root.querySelector('[data-image-status="'+img.dataset.idDocument+'"]');
+   if(status)status.textContent='تعذر عرض الصورة داخل الصفحة. استخدم رابط الفتح أعلاه أو أعد تحميل الطلب.';
+   img.style.display='none';
+  }));
+  root.querySelectorAll('img[data-id-document]').forEach(img=>img.addEventListener('load',()=>{
+   const status=root.querySelector('[data-image-status="'+img.dataset.idDocument+'"]');
+   if(status)status.textContent='تم تحميل الصورة.';
+  }));
+  root.querySelectorAll('[data-approve-tech]').forEach(b=>b.addEventListener('click',()=>reviewTechnicianApplication(b.dataset.approveTech,'approved',b)));
+  root.querySelectorAll('[data-reject-tech]').forEach(b=>b.addEventListener('click',()=>reviewTechnicianApplication(b.dataset.rejectTech,'rejected',b)));
+ }catch(error){
+  console.error('ELmagik load technician applications failed:',error);
+  root.textContent='تعذر تحميل طلبات الفنيين: '+(error?.message||'حدث خطأ غير معروف');
+  showMessage('managerMessage','تعذر تحميل طلبات الفنيين: '+(error?.message||'حدث خطأ غير معروف'),'err');
  }
- const {error:updateError}=await db.from('technician_applications').update({status:decision,reviewed_at:new Date().toISOString()}).eq('id',id).eq('status','pending');
- if(updateError){showMessage('managerMessage','تم تجهيز حساب الفني لكن تعذر تحديث حالة الطلب: '+updateError.message,'err');return;}
- showMessage('managerMessage',decision==='approved'?'تم قبول الفني وتفعيل حسابه، ويمكنه الآن تسجيل الدخول.':'تم رفض طلب الانضمام.');
- await loadManagerApplications();
+}
+async function reviewTechnicianApplication(id,decision,button=null){
+ const buttons=[...document.querySelectorAll('[data-approve-tech="'+id+'"],[data-reject-tech="'+id+'"]')];
+ buttons.forEach(b=>{b.disabled=true;b.dataset.originalText=b.textContent;b.textContent=decision==='approved'?'جارٍ تفعيل الفني...':'جارٍ تنفيذ القرار...';});
+ try{
+  const {data:{user},error:userError}=await db.auth.getUser();
+  if(userError)throw userError;
+  if(!user)throw new Error('جلسة الإدارة انتهت. سجّل الدخول مرة أخرى.');
+  const {data:admin,error:adminError}=await db.from('admins').select('user_id').eq('user_id',user.id).maybeSingle();
+  if(adminError)throw adminError;
+  if(!admin)throw new Error('الحساب الحالي لا يملك صلاحية اعتماد الفنيين.');
+  const {data:app,error:readError}=await db.from('technician_applications').select('*').eq('id',id).maybeSingle();
+  if(readError)throw readError;
+  if(!app)throw new Error('تعذر العثور على طلب الفني.');
+  if(app.status!=='pending')throw new Error('تمت مراجعة هذا الطلب من قبل.');
+  if(decision==='approved'){
+   const {error:upsertError}=await db.from('technicians').upsert({user_id:app.user_id,display_name:app.display_name,phone:app.phone,active:true},{onConflict:'user_id'});
+   if(upsertError)throw new Error('تعذر تفعيل حساب الفني: '+upsertError.message);
+  }
+  const {data:updated,error:updateError}=await db.from('technician_applications').update({status:decision,reviewed_at:new Date().toISOString()}).eq('id',id).eq('status','pending').select('id').maybeSingle();
+  if(updateError)throw new Error('تعذر تحديث حالة الطلب: '+updateError.message);
+  if(!updated)throw new Error('لم تتغير حالة الطلب؛ ربما تمت مراجعته من جلسة أخرى.');
+  showMessage('managerMessage',decision==='approved'?'تم قبول الفني وتفعيل حسابه بنجاح.':'تم رفض طلب الانضمام بنجاح.','ok');
+  await loadManagerApplications();
+  if(decision==='approved')await loadManagerOrders();
+ }catch(error){
+  console.error('ELmagik technician review failed:',error);
+  showMessage('managerMessage','تعذر تنفيذ قرار طلب الفني: '+(error?.message||'حدث خطأ غير معروف'),'err');
+  buttons.forEach(b=>{b.disabled=false;b.textContent=b.dataset.originalText||'إعادة المحاولة';});
+ }
 }
 function managerCard(o){
  const safeTechnicians=Array.isArray(technicians)?technicians:[];
