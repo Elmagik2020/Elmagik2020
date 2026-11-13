@@ -241,8 +241,9 @@ async function loadManagerOrders(){
  if(error){root.textContent='تعذر تحميل الطلبات: '+error.message;showMessage('managerMessage','فشل تحميل طلبات العملاء: '+error.message,'err');return;}
  if(techniciansResult.error){technicians=[];showMessage('managerMessage','تعذر تحميل قائمة الفنيين: '+techniciansResult.error.message,'err');}
  else{technicians=Array.isArray(techniciansResult.data)?techniciansResult.data:[];}
- if(!data?.length){root.textContent='لا توجد طلبات حتى الآن.';return;}
- root.innerHTML=data.map(o=>managerCard(o)).join('');
+ const activeOrders=(data||[]).filter(o=>o.manager_status!=='completed'&&o.archived_at==null);
+ if(!activeOrders.length){root.textContent='لا توجد طلبات نشطة حاليًا. الطلبات المكتملة موجودة في الأرشيف.';return;}
+ root.innerHTML=activeOrders.map(o=>managerCard(o)).join('');
  root.querySelectorAll('[data-save-order]').forEach(b=>b.addEventListener('click',()=>saveManagerOrder(b.dataset.saveOrder,b)));
  root.querySelectorAll('[data-manager-accept-order]').forEach(b=>b.addEventListener('click',()=>acceptCustomerOrder(b.dataset.managerAcceptOrder,b)));
  root.querySelectorAll('[data-chat-open]').forEach(b=>b.addEventListener('click',()=>openOrderChat(b.dataset.chatOpen)));
@@ -374,16 +375,19 @@ async function saveManagerOrder(id,button=null){
   if(readError)throw readError;
   if(!current)throw new Error('الطلب غير موجود أو لا تملك صلاحية الوصول إليه.');
   const assignedNow=Boolean(assigned);
+  const completing=finalStatus==='completed';
+  const now=new Date().toISOString();
   const patch={
    assigned_technician:assigned,status:finalStatus,quoted_price,admin_note,
-   manager_status:assignedNow?'accepted':current.manager_status,
-   accepted_at:assignedNow?(current.accepted_at||new Date().toISOString()):current.accepted_at,
-   archived_at:null,manager_completed_at:null
+   manager_status:completing?'completed':assignedNow?'accepted':current.manager_status,
+   accepted_at:assignedNow?(current.accepted_at||now):current.accepted_at,
+   archived_at:completing?now:null,
+   manager_completed_at:completing?now:null
   };
   const {data,error}=await db.from('service_orders').update(patch).eq('id',id).select('id').maybeSingle();
   if(error)throw error;
   if(!data)throw new Error('لم يتم تحديث الطلب. تأكد من تسجيل الدخول بحساب المدير وأن صلاحيات الإدارة مفعّلة.');
-  showMessage('managerMessage',assignedNow?'تم حفظ الطلب وإسناده للفني ونقله إلى الطلبات المقبولة.':'تم حفظ التعديلات. الطلب محفوظ كطلب جديد لحين اعتماد فني وإسناده.','ok');
+  showMessage('managerMessage',completing?'تم إنهاء الطلب ونقله إلى الأرشيف بنجاح.':assignedNow?'تم حفظ الطلب وإسناده للفني ونقله إلى الطلبات المقبولة.':'تم حفظ التعديلات بنجاح.','ok');
   await loadManagerOrders();
   if(window.__elmagikRefreshWorkflow)await window.__elmagikRefreshWorkflow();
  }catch(err){
