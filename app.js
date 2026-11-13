@@ -205,7 +205,7 @@ async function loadManagerOrders(){
  else{technicians=Array.isArray(techniciansResult.data)?techniciansResult.data:[];}
  if(!data?.length){root.textContent='لا توجد طلبات حتى الآن.';return;}
  root.innerHTML=data.map(o=>managerCard(o)).join('');
- root.querySelectorAll('[data-save-order]').forEach(b=>b.addEventListener('click',()=>saveManagerOrder(b.dataset.saveOrder)));
+ root.querySelectorAll('[data-save-order]').forEach(b=>b.addEventListener('click',()=>saveManagerOrder(b.dataset.saveOrder,b)));
 }
 async function loadManagerApplications(){
  const root=$('managerApplications');if(!root)return;root.innerHTML='<p class="loader">جارٍ تحميل طلبات الانضمام...</p>';
@@ -241,13 +241,30 @@ function managerCard(o){
  const opts=safeTechnicians.map(t=>'<option value="'+esc(t.user_id)+'" '+(t.user_id===o.assigned_technician?'selected':'')+'>'+esc(t.display_name)+'</option>').join('');
  return '<article class="order-card"><div class="order-head"><b>'+esc(o.display_code)+' · '+esc(o.customer_name)+'</b><span class="pill">'+esc(statusNames[o.status]||o.status)+'</span></div><p>'+esc(o.category)+' — '+esc(o.service_name)+'</p><p>طريقة الدفع: '+esc(({cash:'نقدًا',instapay:'إنستا باي',vodafone_cash:'فودافون كاش'})[o.payment_method]||'غير محددة')+'</p><p>الهاتف: '+esc(o.customer_phone)+'<br>العنوان: '+esc(o.address)+'</p><p>نوع الطلب: '+(o.request_type==='immediate'?'فوري':'حجز مسبق')+(o.scheduled_for?' · '+esc(new Date(o.scheduled_for).toLocaleString('ar-EG')):'')+'</p><p>التفاصيل: '+esc(o.details||'لا توجد تفاصيل إضافية')+'</p><div class="order-actions"><div class="field"><label>الفني المسؤول</label><select id="tech-'+esc(o.id)+'"><option value="">لم يتم التعيين</option>'+opts+'</select></div><div class="field"><label>السعر (جنيه)</label><input id="price-'+esc(o.id)+'" type="number" min="0" step="0.01" value="'+(o.quoted_price??'')+'" placeholder="يحدد بواسطة الإدارة"></div><div class="field"><label>حالة الطلب</label><select id="status-'+esc(o.id)+'">'+Object.entries(statusNames).map(([k,v])=>'<option value="'+k+'" '+(o.status===k?'selected':'')+'>'+v+'</option>').join('')+'</select></div><div class="field"><label>ملاحظة الإدارة</label><input id="note-'+esc(o.id)+'" maxlength="1000" value="'+esc(o.admin_note||'')+'"></div></div><button class="btn submit" data-save-order="'+esc(o.id)+'">حفظ وتحديث الطلب</button></article>';
 }
-async function saveManagerOrder(id){
- const assigned=$('tech-'+id).value||null;const status=$('status-'+id).value;const raw=$('price-'+id).value;const quoted_price=raw===''?null:Number(raw);const admin_note=$('note-'+id).value.trim()||null;
- if(quoted_price!==null&&(!Number.isFinite(quoted_price)||quoted_price<0)){showMessage('managerMessage','أدخل سعرًا صحيحًا.','err');return;}
- let finalStatus=status;if(assigned&&finalStatus==='new')finalStatus='assigned';if(!assigned&&finalStatus==='assigned')finalStatus='new';const patch={assigned_technician:assigned,status:finalStatus,quoted_price,admin_note};
- const {error}=await db.from('service_orders').update(patch).eq('id',id);
- if(error){showMessage('managerMessage','تعذر حفظ الطلب: '+error.message,'err');return;}
- showMessage('managerMessage','تم تحديث الطلب بنجاح.');await loadManagerOrders();
+async function saveManagerOrder(id,button=null){
+ const btn=button||document.querySelector('[data-save-order="'+id+'"]');
+ try{
+  const tech=$('tech-'+id),statusInput=$('status-'+id),priceInput=$('price-'+id),noteInput=$('note-'+id);
+  if(!tech||!statusInput||!priceInput||!noteInput)throw new Error('تعذر قراءة بيانات الطلب. حدّث الصفحة وحاول مرة أخرى.');
+  const assigned=tech.value||null,status=statusInput.value,raw=priceInput.value;
+  const quoted_price=raw===''?null:Number(raw),admin_note=noteInput.value.trim()||null;
+  if(quoted_price!==null&&(!Number.isFinite(quoted_price)||quoted_price<0))throw new Error('أدخل سعرًا صحيحًا أكبر من أو يساوي صفرًا.');
+  let finalStatus=status;
+  if(assigned&&finalStatus==='new')finalStatus='assigned';
+  if(!assigned&&finalStatus==='assigned')finalStatus='new';
+  const patch={assigned_technician:assigned,status:finalStatus,quoted_price,admin_note};
+  if(btn){btn.disabled=true;btn.textContent='جارٍ حفظ الطلب...';}
+  const {data,error}=await db.from('service_orders').update(patch).eq('id',id).select('id').maybeSingle();
+  if(error)throw error;
+  if(!data)throw new Error('لم يتم تحديث الطلب. تأكد من تسجيل الدخول بحساب المدير وأن صلاحيات الإدارة مفعّلة.');
+  showMessage('managerMessage','تم حفظ الطلب وتحديث بياناته بنجاح.','ok');
+  await loadManagerOrders();
+ }catch(err){
+  console.error('ELmagik save manager order failed:',err);
+  showMessage('managerMessage','تعذر حفظ الطلب: '+(err?.message||'حدث خطأ غير معروف. حاول مرة أخرى.'),'err');
+ }finally{
+  if(btn){btn.disabled=false;btn.textContent='حفظ وتحديث الطلب';}
+ }
 }
 async function loadTechOrders(){
  const root=$('techOrders');root.innerHTML='<p class="loader">جارٍ تحميل الطلبات...</p>';
