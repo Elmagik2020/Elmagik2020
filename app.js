@@ -280,7 +280,8 @@ async function reviewTechnicianApplication(id,decision){
 function managerCard(o){
  const safeTechnicians=Array.isArray(technicians)?technicians:[];
  const opts=safeTechnicians.map(t=>'<option value="'+esc(t.user_id)+'" '+(t.user_id===o.assigned_technician?'selected':'')+'>'+esc(t.display_name)+'</option>').join('');
- return '<article class="order-card"><div class="order-head"><b>'+esc(o.display_code)+' · '+esc(o.customer_name)+'</b><span class="pill">'+esc(statusNames[o.status]||o.status)+'</span></div><p>'+esc(o.category)+' — '+esc(o.service_name)+'</p><p>طريقة الدفع: '+esc(({cash:'نقدًا',instapay:'إنستا باي',vodafone_cash:'فودافون كاش'})[o.payment_method]||'غير محددة')+'</p><p>الهاتف: '+esc(o.customer_phone)+'<br>العنوان: '+esc(o.address)+'</p><p>نوع الطلب: '+(o.request_type==='immediate'?'فوري':'حجز مسبق')+(o.scheduled_for?' · '+esc(new Date(o.scheduled_for).toLocaleString('ar-EG')):'')+'</p><p>التفاصيل: '+esc(o.details||'لا توجد تفاصيل إضافية')+'</p><div class="order-actions"><div class="field"><label>الفني المسؤول</label><select id="tech-'+esc(o.id)+'"><option value="">لم يتم التعيين</option>'+opts+'</select></div><div class="field"><label>السعر (جنيه)</label><input id="price-'+esc(o.id)+'" type="number" min="0" step="0.01" value="'+(o.quoted_price??'')+'" placeholder="يحدد بواسطة الإدارة"></div><div class="field"><label>حالة الطلب</label><select id="status-'+esc(o.id)+'">'+Object.entries(statusNames).map(([k,v])=>'<option value="'+k+'" '+(o.status===k?'selected':'')+'>'+v+'</option>').join('')+'</select></div><div class="field"><label>ملاحظة الإدارة</label><input id="note-'+esc(o.id)+'" maxlength="1000" value="'+esc(o.admin_note||'')+'"></div></div><button class="btn submit" data-save-order="'+esc(o.id)+'">حفظ وتحديث الطلب</button><button class="btn alt" type="button" data-chat-open="'+esc(o.id)+'">فتح محادثة الطلب</button><section id="chat-panel-'+esc(o.id)+'" class="order-card hide"><div class="order-head"><b>محادثة الطلب</b><button class="btn alt" type="button" data-chat-close="'+esc(o.id)+'">إغلاق</button></div><div id="chat-log-'+esc(o.id)+'" aria-live="polite"></div><form data-chat-form="'+esc(o.id)+'"><div class="field"><textarea id="chat-input-'+esc(o.id)+'" maxlength="2000" required placeholder="اكتب رسالتك..."></textarea></div><button class="btn submit" type="submit">إرسال الرسالة</button></form><p id="chat-notice-'+esc(o.id)+'" class="small" aria-live="polite"></p></section></article>';
+ const technicianHint=safeTechnicians.length?'':'<small class="small">لا يوجد فنيون معتمدون حاليًا. راجع طلبات انضمام الفنيين ووافق على فني أولًا.</small>';
+ return '<article class="order-card"><div class="order-head"><b>'+esc(o.display_code)+' · '+esc(o.customer_name)+'</b><span class="pill">'+esc(statusNames[o.status]||o.status)+'</span></div><p>'+esc(o.category)+' — '+esc(o.service_name)+'</p><p>طريقة الدفع: '+esc(({cash:'نقدًا',instapay:'إنستا باي',vodafone_cash:'فودافون كاش'})[o.payment_method]||'غير محددة')+'</p><p>الهاتف: '+esc(o.customer_phone)+'<br>العنوان: '+esc(o.address)+'</p><p>نوع الطلب: '+(o.request_type==='immediate'?'فوري':'حجز مسبق')+(o.scheduled_for?' · '+esc(new Date(o.scheduled_for).toLocaleString('ar-EG')):'')+'</p><p>التفاصيل: '+esc(o.details||'لا توجد تفاصيل إضافية')+'</p><div class="order-actions"><div class="field"><label>الفني المسؤول</label><select id="tech-'+esc(o.id)+'"><option value="">لم يتم التعيين</option>'+opts+(safeTechnicians.length?'':'<option value="" disabled>لا يوجد فنيون معتمدون</option>')+'</select>'+technicianHint+'</div><div class="field"><label>السعر (جنيه)</label><input id="price-'+esc(o.id)+'" type="number" min="0" step="0.01" value="'+(o.quoted_price??'')+'" placeholder="يحدد بواسطة الإدارة"></div><div class="field"><label>حالة الطلب</label><select id="status-'+esc(o.id)+'">'+Object.entries(statusNames).map(([k,v])=>'<option value="'+k+'" '+(o.status===k?'selected':'')+'>'+v+'</option>').join('')+'</select></div><div class="field"><label>ملاحظة الإدارة</label><input id="note-'+esc(o.id)+'" maxlength="1000" value="'+esc(o.admin_note||'')+'"></div></div><button class="btn submit" data-save-order="'+esc(o.id)+'">حفظ وتحديث الطلب</button><button class="btn alt" type="button" data-chat-open="'+esc(o.id)+'">فتح محادثة الطلب</button><section id="chat-panel-'+esc(o.id)+'" class="order-card hide"><div class="order-head"><b>محادثة الطلب</b><button class="btn alt" type="button" data-chat-close="'+esc(o.id)+'">إغلاق</button></div><div id="chat-log-'+esc(o.id)+'" aria-live="polite"></div><form data-chat-form="'+esc(o.id)+'"><div class="field"><textarea id="chat-input-'+esc(o.id)+'" maxlength="2000" required placeholder="اكتب رسالتك..."></textarea></div><button class="btn submit" type="submit">إرسال الرسالة</button></form><p id="chat-notice-'+esc(o.id)+'" class="small" aria-live="polite"></p></section></article>';
 }
 async function saveManagerOrder(id,button=null){
  const btn=button||document.querySelector('[data-save-order="'+id+'"]');
@@ -289,24 +290,27 @@ async function saveManagerOrder(id,button=null){
   if(!tech||!statusInput||!priceInput||!noteInput)throw new Error('تعذر قراءة بيانات الطلب. حدّث الصفحة وحاول مرة أخرى.');
   const assigned=tech.value||null,status=statusInput.value,raw=priceInput.value;
   const quoted_price=raw===''?null:Number(raw),admin_note=noteInput.value.trim()||null;
-  if(!assigned)throw new Error('اختر الفني المسؤول أولًا حتى يتم قبول الطلب إداريًا.');
-  if(quoted_price===null||!Number.isFinite(quoted_price)||quoted_price<0)throw new Error('حدد سعر الخدمة أولًا حتى يتم قبول الطلب إداريًا.');
+  if(raw!==''&&(!Number.isFinite(quoted_price)||quoted_price<0))throw new Error('أدخل سعرًا صحيحًا أو اترك خانة السعر فارغة.');
+  const needsTechnician=['assigned','accepted','in_progress','completed'].includes(status);
+  if(needsTechnician&&!assigned)throw new Error('لا يمكن نقل الطلب لهذه المرحلة قبل اعتماد فني واختياره من قائمة الفني المسؤول.');
+  if(assigned&&quoted_price===null)throw new Error('حدد سعر الخدمة قبل إسناد الطلب للفني.');
   let finalStatus=status;
-  if(finalStatus==='new')finalStatus='assigned';
-  if(finalStatus==='assigned'&&!assigned)finalStatus='new';
-  const patch={assigned_technician:assigned,status:finalStatus,quoted_price,admin_note};
-  if(btn){btn.disabled=true;btn.textContent='جارٍ حفظ وقبول الطلب...';}
+  if(finalStatus==='new'&&assigned)finalStatus='assigned';
+  if(btn){btn.disabled=true;btn.textContent='جارٍ حفظ التعديلات...';}
   const {data:current,error:readError}=await db.from('service_orders').select('manager_status,accepted_at').eq('id',id).maybeSingle();
   if(readError)throw readError;
   if(!current)throw new Error('الطلب غير موجود أو لا تملك صلاحية الوصول إليه.');
-  if(current.manager_status==='pending'){
-   patch.manager_status='accepted';
-   patch.accepted_at=current.accepted_at||new Date().toISOString();
-  }
+  const assignedNow=Boolean(assigned);
+  const patch={
+   assigned_technician:assigned,status:finalStatus,quoted_price,admin_note,
+   manager_status:assignedNow?'accepted':(finalStatus==='cancelled'?current.manager_status:'pending'),
+   accepted_at:assignedNow?(current.accepted_at||new Date().toISOString()):null,
+   archived_at:null,manager_completed_at:null
+  };
   const {data,error}=await db.from('service_orders').update(patch).eq('id',id).select('id').maybeSingle();
   if(error)throw error;
   if(!data)throw new Error('لم يتم تحديث الطلب. تأكد من تسجيل الدخول بحساب المدير وأن صلاحيات الإدارة مفعّلة.');
-  showMessage('managerMessage',current.manager_status==='pending'?'تم حفظ الطلب وقبوله إداريًا ونقله إلى الطلبات المقبولة.':'تم حفظ بيانات الطلب بنجاح.','ok');
+  showMessage('managerMessage',assignedNow?'تم حفظ الطلب وإسناده للفني ونقله إلى الطلبات المقبولة.':'تم حفظ التعديلات. الطلب محفوظ كطلب جديد لحين اعتماد فني وإسناده.','ok');
   await loadManagerOrders();
   if(window.__elmagikRefreshWorkflow)await window.__elmagikRefreshWorkflow();
  }catch(err){
