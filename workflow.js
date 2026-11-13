@@ -3,7 +3,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const supabase = window.__elmagikSupabase || createClient(
   'https://ehswwwhonicinexutzruo.supabase.co',
   'sb_publishable_bTedgB2z-k0bFylHHRucTw_1nE6eESZ',
-  { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'elmagik-cool-auth-workflow-fallback' } }
+  { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'elmagik-cool-auth' } }
 );
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -201,10 +201,22 @@ async function loadWorkflowOrders() {
 }
 function activeAdmin(){return Boolean(window.__elmagikWorkflowAdmin);}
 async function setManagerStatus(id,status) {
-  const patch=status==='accepted'?{manager_status:'accepted',accepted_at:new Date().toISOString()}:{manager_status:'completed',manager_completed_at:new Date().toISOString(),archived_at:new Date().toISOString()};
-  const {error}=await supabase.from('service_orders').update(patch).eq('id',id);
-  if(error){alert('تعذر تحديث الطلب: '+error.message);return;}
-  await loadWorkflowOrders();
+  try {
+    const {data:{user},error:userError}=await supabase.auth.getUser();
+    if(userError) throw userError;
+    if(!user) throw new Error('جلسة الإدارة غير متصلة. سجّل الخروج ثم ادخل مرة أخرى.');
+    const {data:admin,error:adminError}=await supabase.from('admins').select('user_id').eq('user_id',user.id).maybeSingle();
+    if(adminError) throw adminError;
+    if(!admin) throw new Error('الحساب الحالي لا يملك صلاحية اعتماد الطلبات.');
+    const patch=status==='accepted'?{manager_status:'accepted',accepted_at:new Date().toISOString()}:{manager_status:'completed',manager_completed_at:new Date().toISOString(),archived_at:new Date().toISOString()};
+    const {data,error}=await supabase.from('service_orders').update(patch).eq('id',id).select('id').maybeSingle();
+    if(error) throw error;
+    if(!data) throw new Error('لم يتم تحديث الطلب. تحقق من صلاحية المدير ثم أعد المحاولة.');
+    await loadWorkflowOrders();
+  } catch(error) {
+    console.error('ELmagik workflow order update failed:',error);
+    alert('تعذر تحديث الطلب: '+(error?.message||'حدث خطأ غير معروف.'));
+  }
 }
 async function openManagerChat(id,code) {
   const box=$('managerChatBox'), root=$('managerChatMessages');
