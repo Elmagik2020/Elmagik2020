@@ -107,7 +107,7 @@ async function login(email,password,messageId){
 $('managerForgotBtn').addEventListener('click',async()=>{
  const btn=$('managerForgotBtn');btn.disabled=true;btn.textContent='جارٍ إرسال الرابط...';
  try{
-  const email='abdallahradwan1992@gmail.com';
+  const email='elmagikcool@gmail.com';
   const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:'https://elmagikcool.vercel.app/app.html'});
   if(error)throw error;
   showMessage('managerMessage','تم طلب رابط إنشاء كلمة مرور جديدة. افحص صندوق الوارد والرسائل غير المرغوب فيها للبريد '+email+'. افتح الرابط من نفس الجهاز لإكمال تعيين كلمة المرور.','ok');
@@ -115,7 +115,7 @@ $('managerForgotBtn').addEventListener('click',async()=>{
  finally{btn.disabled=false;btn.textContent='إنشاء / استعادة كلمة المرور';}
 });
 db.auth.onAuthStateChange((event,session)=>{
- if(event==='PASSWORD_RECOVERY'&&session?.user?.email?.toLowerCase()==='abdallahradwan1992@gmail.com'){
+ if(event==='PASSWORD_RECOVERY'&&session?.user?.email?.toLowerCase()==='elmagikcool@gmail.com'){
   setView('manager');
   $('managerResetPanel').classList.remove('hide');
   $('managerLogin').classList.add('hide');
@@ -130,7 +130,7 @@ $('managerResetForm').addEventListener('submit',async e=>{
  btn.disabled=true;btn.textContent='جارٍ حفظ كلمة المرور...';
  try{
   const {data:{user},error}=await db.auth.getUser();
-  if(error||!user||user.email?.toLowerCase()!=='abdallahradwan1992@gmail.com')throw new Error('رابط الاستعادة غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا.');
+  if(error||!user||user.email?.toLowerCase()!=='elmagikcool@gmail.com')throw new Error('رابط الاستعادة غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا.');
   const {error:updateError}=await db.auth.updateUser({password});
   if(updateError)throw updateError;
   await db.auth.signOut();
@@ -151,7 +151,7 @@ $('managerChangePasswordForm').addEventListener('submit',async e=>{
  if(current===next){showMessage('managerChangePasswordMessage','اختر كلمة مرور مختلفة عن الحالية.','err');return;}
  btn.disabled=true;btn.textContent='جارٍ تغيير كلمة المرور...';
  try{
-  const email='abdallahradwan1992@gmail.com';
+  const email='elmagikcool@gmail.com';
   const {data:{user},error:userError}=await db.auth.getUser();
   if(userError||!user||user.email?.toLowerCase()!==email)throw new Error('يجب تسجيل الدخول بحساب المدير الأساسي لتغيير كلمة المرور.');
   const {error:verifyError}=await db.auth.signInWithPassword({email,password:current});
