@@ -376,8 +376,8 @@ async function saveManagerOrder(id,button=null){
   const assignedNow=Boolean(assigned);
   const patch={
    assigned_technician:assigned,status:finalStatus,quoted_price,admin_note,
-   manager_status:assignedNow?'accepted':(finalStatus==='cancelled'?current.manager_status:'pending'),
-   accepted_at:assignedNow?(current.accepted_at||new Date().toISOString()):null,
+   manager_status:assignedNow?'accepted':current.manager_status,
+   accepted_at:assignedNow?(current.accepted_at||new Date().toISOString()):current.accepted_at,
    archived_at:null,manager_completed_at:null
   };
   const {data,error}=await db.from('service_orders').update(patch).eq('id',id).select('id').maybeSingle();
