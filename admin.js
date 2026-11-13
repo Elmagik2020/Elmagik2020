@@ -45,7 +45,7 @@ function resolveAdminEmail(value){
  if(v.includes('@'))return v;
  const digits=v.replace(/\D/g,'');
  // رقم الهاتف المسجل كاختصار للدخول، بينما المصادقة الفعلية تتم بحساب Gmail المرتبط.
- if(['20120489622','0120489622','+20120489622'].includes(digits)||digits==='20120489622')return 'abdallahradwan1992@gmail.com';
+ if(['20120489622','0120489622','+20120489622'].includes(digits)||digits==='20120489622')return 'elmagikcool@gmail.com';
  return '';
 }
 function validNewPassword(a,b){
