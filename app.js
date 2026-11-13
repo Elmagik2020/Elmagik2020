@@ -16,6 +16,44 @@ let activeUser=null,activeRole=null,technicians=[];
 function showMessage(id,msg,type=''){const el=$(id);el.className=type?'notice '+type:'small';el.textContent=msg;}
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function code(){return 'EM-'+Array.from(crypto.getRandomValues(new Uint8Array(4))).map(x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();}
+const orderChatChannels=new Map();
+async function loadOrderChatMessages(orderId){
+ const log=$('chat-log-'+orderId);if(!log)return;
+ const {data,error}=await db.from('order_messages').select('id,sender_id,sender_role,body,created_at').eq('order_id',orderId).order('created_at',{ascending:true}).limit(100);
+ if(error){log.textContent='تعذر تحميل المحادثة: '+error.message;return;}
+ log.innerHTML=(data||[]).map(m=>'<div class="order-card"><div class="order-head"><b>'+esc(m.sender_role==='admin'?'الإدارة':m.sender_role==='technician'?'الفني':'العميل')+'</b><small class="small">'+esc(new Date(m.created_at).toLocaleString('ar-EG'))+'</small></div><p style="white-space:pre-wrap">'+esc(m.body)+'</p></div>').join('')||'<p class="small">لا توجد رسائل في هذه المحادثة بعد.</p>';
+ log.scrollTop=log.scrollHeight;
+}
+function closeOrderChat(orderId){
+ $('chat-panel-'+orderId)?.classList.add('hide');
+ const channel=orderChatChannels.get(orderId);
+ if(channel){db.removeChannel(channel);orderChatChannels.delete(orderId);}
+}
+async function openOrderChat(orderId){
+ const panel=$('chat-panel-'+orderId);if(!panel)return;
+ panel.classList.remove('hide');
+ await loadOrderChatMessages(orderId);
+ if(!orderChatChannels.has(orderId)){
+  const channel=db.channel('elmagik-order-chat-'+orderId).on('postgres_changes',{event:'INSERT',schema:'public',table:'order_messages',filter:'order_id=eq.'+orderId},()=>loadOrderChatMessages(orderId)).subscribe();
+  orderChatChannels.set(orderId,channel);
+ }
+}
+async function sendOrderChatMessage(event,orderId){
+ event.preventDefault();
+ const input=$('chat-input-'+orderId),notice=$('chat-notice-'+orderId),body=input?.value.trim();
+ if(!body||body.length>2000){if(notice)notice.textContent='اكتب رسالة من حرف واحد إلى 2000 حرف.';return;}
+ if(!activeUser||!['admin','technician'].includes(activeRole)){if(notice)notice.textContent='سجّل الدخول بحساب الإدارة أو الفني أولًا.';return;}
+ const form=document.querySelector('[data-chat-form="'+orderId+'"]'),button=form?.querySelector('button[type="submit"]');
+ if(button){button.disabled=true;button.textContent='جارٍ الإرسال...';}
+ try{
+  const {error}=await db.from('order_messages').insert({order_id:orderId,sender_id:activeUser.id,sender_role:activeRole,body});
+  if(error)throw error;
+  input.value='';if(notice)notice.textContent='تم إرسال الرسالة.';
+  await loadOrderChatMessages(orderId);
+ }catch(err){if(notice)notice.textContent='تعذر إرسال الرسالة: '+(err.message||'حاول مرة أخرى.');}
+ finally{if(button){button.disabled=false;button.textContent='إرسال الرسالة';}}
+}
+
 function selectedType(){return document.querySelector('input[name="requestType"]:checked')?.value||'immediate';}
 function setView(name){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.view===name));['customer','technician','manager','join'].forEach(v=>$(v+'View').classList.toggle('hide',v!==name));}
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
@@ -206,6 +244,9 @@ async function loadManagerOrders(){
  if(!data?.length){root.textContent='لا توجد طلبات حتى الآن.';return;}
  root.innerHTML=data.map(o=>managerCard(o)).join('');
  root.querySelectorAll('[data-save-order]').forEach(b=>b.addEventListener('click',()=>saveManagerOrder(b.dataset.saveOrder,b)));
+ root.querySelectorAll('[data-chat-open]').forEach(b=>b.addEventListener('click',()=>openOrderChat(b.dataset.chatOpen)));
+ root.querySelectorAll('[data-chat-close]').forEach(b=>b.addEventListener('click',()=>closeOrderChat(b.dataset.chatClose)));
+ root.querySelectorAll('[data-chat-form]').forEach(form=>form.addEventListener('submit',e=>sendOrderChatMessage(e,form.dataset.chatForm)));
 }
 async function loadManagerApplications(){
  const root=$('managerApplications');if(!root)return;root.innerHTML='<p class="loader">جارٍ تحميل طلبات الانضمام...</p>';
@@ -239,7 +280,7 @@ async function reviewTechnicianApplication(id,decision){
 function managerCard(o){
  const safeTechnicians=Array.isArray(technicians)?technicians:[];
  const opts=safeTechnicians.map(t=>'<option value="'+esc(t.user_id)+'" '+(t.user_id===o.assigned_technician?'selected':'')+'>'+esc(t.display_name)+'</option>').join('');
- return '<article class="order-card"><div class="order-head"><b>'+esc(o.display_code)+' · '+esc(o.customer_name)+'</b><span class="pill">'+esc(statusNames[o.status]||o.status)+'</span></div><p>'+esc(o.category)+' — '+esc(o.service_name)+'</p><p>طريقة الدفع: '+esc(({cash:'نقدًا',instapay:'إنستا باي',vodafone_cash:'فودافون كاش'})[o.payment_method]||'غير محددة')+'</p><p>الهاتف: '+esc(o.customer_phone)+'<br>العنوان: '+esc(o.address)+'</p><p>نوع الطلب: '+(o.request_type==='immediate'?'فوري':'حجز مسبق')+(o.scheduled_for?' · '+esc(new Date(o.scheduled_for).toLocaleString('ar-EG')):'')+'</p><p>التفاصيل: '+esc(o.details||'لا توجد تفاصيل إضافية')+'</p><div class="order-actions"><div class="field"><label>الفني المسؤول</label><select id="tech-'+esc(o.id)+'"><option value="">لم يتم التعيين</option>'+opts+'</select></div><div class="field"><label>السعر (جنيه)</label><input id="price-'+esc(o.id)+'" type="number" min="0" step="0.01" value="'+(o.quoted_price??'')+'" placeholder="يحدد بواسطة الإدارة"></div><div class="field"><label>حالة الطلب</label><select id="status-'+esc(o.id)+'">'+Object.entries(statusNames).map(([k,v])=>'<option value="'+k+'" '+(o.status===k?'selected':'')+'>'+v+'</option>').join('')+'</select></div><div class="field"><label>ملاحظة الإدارة</label><input id="note-'+esc(o.id)+'" maxlength="1000" value="'+esc(o.admin_note||'')+'"></div></div><button class="btn submit" data-save-order="'+esc(o.id)+'">حفظ وتحديث الطلب</button></article>';
+ return '<article class="order-card"><div class="order-head"><b>'+esc(o.display_code)+' · '+esc(o.customer_name)+'</b><span class="pill">'+esc(statusNames[o.status]||o.status)+'</span></div><p>'+esc(o.category)+' — '+esc(o.service_name)+'</p><p>طريقة الدفع: '+esc(({cash:'نقدًا',instapay:'إنستا باي',vodafone_cash:'فودافون كاش'})[o.payment_method]||'غير محددة')+'</p><p>الهاتف: '+esc(o.customer_phone)+'<br>العنوان: '+esc(o.address)+'</p><p>نوع الطلب: '+(o.request_type==='immediate'?'فوري':'حجز مسبق')+(o.scheduled_for?' · '+esc(new Date(o.scheduled_for).toLocaleString('ar-EG')):'')+'</p><p>التفاصيل: '+esc(o.details||'لا توجد تفاصيل إضافية')+'</p><div class="order-actions"><div class="field"><label>الفني المسؤول</label><select id="tech-'+esc(o.id)+'"><option value="">لم يتم التعيين</option>'+opts+'</select></div><div class="field"><label>السعر (جنيه)</label><input id="price-'+esc(o.id)+'" type="number" min="0" step="0.01" value="'+(o.quoted_price??'')+'" placeholder="يحدد بواسطة الإدارة"></div><div class="field"><label>حالة الطلب</label><select id="status-'+esc(o.id)+'">'+Object.entries(statusNames).map(([k,v])=>'<option value="'+k+'" '+(o.status===k?'selected':'')+'>'+v+'</option>').join('')+'</select></div><div class="field"><label>ملاحظة الإدارة</label><input id="note-'+esc(o.id)+'" maxlength="1000" value="'+esc(o.admin_note||'')+'"></div></div><button class="btn submit" data-save-order="'+esc(o.id)+'">حفظ وتحديث الطلب</button><button class="btn alt" type="button" data-chat-open=""'+esc(o.id)+'"">فتح محادثة الطلب</button><section id="chat-panel-"'+esc(o.id)+'"" class="order-card hide"><div class="order-head"><b>محادثة الطلب</b><button class="btn alt" type="button" data-chat-close=""'+esc(o.id)+'"">إغلاق</button></div><div id="chat-log-"'+esc(o.id)+'"" aria-live="polite"></div><form data-chat-form=""'+esc(o.id)+'""><div class="field"><textarea id="chat-input-"'+esc(o.id)+'"" maxlength="2000" required placeholder="اكتب رسالتك..."></textarea></div><button class="btn submit" type="submit">إرسال الرسالة</button></form><p id="chat-notice-"'+esc(o.id)+'"" class="small" aria-live="polite"></p></section></article>';
 }
 async function saveManagerOrder(id,button=null){
  const btn=button||document.querySelector('[data-save-order="'+id+'"]');
@@ -280,7 +321,10 @@ async function loadTechOrders(){
  const {data,error}=await db.from('service_orders').select('*').eq('assigned_technician',activeUser.id).order('created_at',{ascending:false});
  if(error){root.textContent='تعذر تحميل الطلبات: '+error.message;return;}
  if(!data?.length){root.textContent='لا توجد طلبات مسندة إليك حاليًا.';return;}
- root.innerHTML=data.map(o=>{const options=o.status==='assigned'?'<option value="accepted">قبول الطلب</option><option value="in_progress">بدء التنفيذ</option>':o.status==='accepted'?'<option value="in_progress">بدء التنفيذ</option><option value="completed">تم الإنجاز</option>':o.status==='in_progress'?'<option value="completed">تم الإنجاز</option>':'';return '<article class="order-card"><div class="order-head"><b>'+esc(o.display_code)+' · '+esc(o.service_name)+'</b><span class="pill">'+esc(statusNames[o.status]||o.status)+'</span></div><p>العميل: '+esc(o.customer_name)+' · '+esc(o.customer_phone)+'</p><p>العنوان: '+esc(o.address)+'</p><p>التفاصيل: '+esc(o.details||'لا توجد تفاصيل إضافية')+'</p>'+ (options?'<div class="order-actions"><div class="field"><label>تحديث الحالة</label><select id="tech-status-'+esc(o.id)+'">'+options+'</select></div><div class="field"><label>ملاحظات الفني</label><input id="tech-note-'+esc(o.id)+'" maxlength="1000" value="'+esc(o.technician_note||'')+'"></div></div><button class="btn submit" data-tech-save="'+esc(o.id)+'">تحديث الحالة</button>':'<p class="pill">لا توجد إجراءات متاحة لهذا الطلب</p>')+'</article>';}).join('');
+ root.innerHTML=data.map(o=>{const options=o.status==='assigned'?'<option value="accepted">قبول الطلب</option><option value="in_progress">بدء التنفيذ</option>':o.status==='accepted'?'<option value="in_progress">بدء التنفيذ</option><option value="completed">تم الإنجاز</option>':o.status==='in_progress'?'<option value="completed">تم الإنجاز</option>':'';return '<article class="order-card"><div class="order-head"><b>'+esc(o.display_code)+' · '+esc(o.service_name)+'</b><span class="pill">'+esc(statusNames[o.status]||o.status)+'</span></div><p>العميل: '+esc(o.customer_name)+' · '+esc(o.customer_phone)+'</p><p>العنوان: '+esc(o.address)+'</p><p>التفاصيل: '+esc(o.details||'لا توجد تفاصيل إضافية')+'</p>'+ (options?'<div class="order-actions"><div class="field"><label>تحديث الحالة</label><select id="tech-status-'+esc(o.id)+'">'+options+'</select></div><div class="field"><label>ملاحظات الفني</label><input id="tech-note-'+esc(o.id)+'" maxlength="1000" value="'+esc(o.technician_note||'')+'"></div></div><button class="btn submit" data-tech-save="'+esc(o.id)+'">تحديث الحالة</button>':'<p class="pill">لا توجد إجراءات متاحة لهذا الطلب</p>')+'<button class="btn alt" type="button" data-chat-open="'+esc(o.id)+'">فتح محادثة الطلب</button><section id="chat-panel-'+esc(o.id)+'" class="order-card hide"><div class="order-head"><b>محادثة الطلب</b><button class="btn alt" type="button" data-chat-close="'+esc(o.id)+'">إغلاق</button></div><div id="chat-log-'+esc(o.id)+'" aria-live="polite"></div><form data-chat-form="'+esc(o.id)+'"><div class="field"><textarea id="chat-input-'+esc(o.id)+'" maxlength="2000" required placeholder="اكتب رسالتك..."></textarea></div><button class="btn submit" type="submit">إرسال الرسالة</button></form><p id="chat-notice-'+esc(o.id)+'" class="small" aria-live="polite"></p></section></article>';}).join('');
+ root.querySelectorAll('[data-chat-open]').forEach(b=>b.addEventListener('click',()=>openOrderChat(b.dataset.chatOpen)));
+ root.querySelectorAll('[data-chat-close]').forEach(b=>b.addEventListener('click',()=>closeOrderChat(b.dataset.chatClose)));
+ root.querySelectorAll('[data-chat-form]').forEach(form=>form.addEventListener('submit',e=>sendOrderChatMessage(e,form.dataset.chatForm)));
  root.querySelectorAll('[data-tech-save]').forEach(b=>b.addEventListener('click',()=>saveTechOrder(b.dataset.techSave)));
 }
 async function saveTechOrder(id){
