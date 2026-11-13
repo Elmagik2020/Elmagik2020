@@ -281,8 +281,8 @@ async function loadManagerApplications(){
     return '<a href="'+esc(url)+'" target="_blank" rel="noopener" title="فتح '+side+' بالحجم الكامل"><img data-id-document="'+side+'" src="'+esc(url)+'" alt="'+side+'" loading="eager" style="display:block;width:min(100%,260px);height:170px;object-fit:contain;background:#f3f4f6;border:1px solid #d1d5db;border-radius:10px;padding:4px"></a><a href="'+esc(url)+'" target="_blank" rel="noopener">فتح وتكبير '+side+'</a><small class="small" data-image-status="'+side+'"></small>';
    };
    return '<article class="order-card"><div class="order-head"><b>'+esc(a.display_name)+'</b><span class="pill">'+(a.status==='pending'?'بانتظار المراجعة':a.status==='approved'?'تم القبول':'مرفوض')+'</span></div><p>البريد: '+esc(a.email)+'<br>الهاتف: '+esc(a.phone)+'<br>المحافظة: '+esc(a.governorate)+' – '+esc(a.area)+'</p><p>الخبرة: '+esc(a.years_experience)+' سنة<br>التخصصات: '+esc((a.specialties||[]).join('، '))+'</p><p>نبذة: '+esc(a.notes||'لا توجد نبذة')+'</p><div style="margin:12px 0"><b>صور بطاقة الرقم القومي</b><div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px"><div style="display:grid;gap:6px;min-width:140px"><b>الوجه الأمامي</b>'+imageView(frontUrl,a.id_front_path,frontError,'الوجه الأمامي')+'</div><div style="display:grid;gap:6px;min-width:140px"><b>الوجه الخلفي</b>'+imageView(backUrl,a.id_back_path,backError,'الوجه الخلفي')+'</div></div></div>'+(a.status==='pending'?'<div class="order-actions"><button class="btn green" type="button" data-approve-tech="'+esc(a.id)+'">قبول وتفعيل الفني</button><button class="btn alt" type="button" data-reject-tech="'+esc(a.id)+'">رفض الطلب</button></div>':'')+'</article>';
-  })).join('');
-  root.innerHTML=cards;
+  }));
+  root.innerHTML=cards.join('');
   root.querySelectorAll('img[data-id-document]').forEach(img=>img.addEventListener('error',()=>{
    const status=root.querySelector('[data-image-status="'+img.dataset.idDocument+'"]');
    if(status)status.textContent='تعذر عرض الصورة داخل الصفحة. استخدم رابط الفتح أعلاه أو أعد تحميل الطلب.';
