@@ -248,17 +248,26 @@ async function saveManagerOrder(id,button=null){
   if(!tech||!statusInput||!priceInput||!noteInput)throw new Error('تعذر قراءة بيانات الطلب. حدّث الصفحة وحاول مرة أخرى.');
   const assigned=tech.value||null,status=statusInput.value,raw=priceInput.value;
   const quoted_price=raw===''?null:Number(raw),admin_note=noteInput.value.trim()||null;
-  if(quoted_price!==null&&(!Number.isFinite(quoted_price)||quoted_price<0))throw new Error('أدخل سعرًا صحيحًا أكبر من أو يساوي صفرًا.');
+  if(!assigned)throw new Error('اختر الفني المسؤول أولًا حتى يتم قبول الطلب إداريًا.');
+  if(quoted_price===null||!Number.isFinite(quoted_price)||quoted_price<0)throw new Error('حدد سعر الخدمة أولًا حتى يتم قبول الطلب إداريًا.');
   let finalStatus=status;
-  if(assigned&&finalStatus==='new')finalStatus='assigned';
-  if(!assigned&&finalStatus==='assigned')finalStatus='new';
+  if(finalStatus==='new')finalStatus='assigned';
+  if(finalStatus==='assigned'&&!assigned)finalStatus='new';
   const patch={assigned_technician:assigned,status:finalStatus,quoted_price,admin_note};
-  if(btn){btn.disabled=true;btn.textContent='جارٍ حفظ الطلب...';}
+  if(btn){btn.disabled=true;btn.textContent='جارٍ حفظ وقبول الطلب...';}
+  const {data:current,error:readError}=await db.from('service_orders').select('manager_status,accepted_at').eq('id',id).maybeSingle();
+  if(readError)throw readError;
+  if(!current)throw new Error('الطلب غير موجود أو لا تملك صلاحية الوصول إليه.');
+  if(current.manager_status==='pending'){
+   patch.manager_status='accepted';
+   patch.accepted_at=current.accepted_at||new Date().toISOString();
+  }
   const {data,error}=await db.from('service_orders').update(patch).eq('id',id).select('id').maybeSingle();
   if(error)throw error;
   if(!data)throw new Error('لم يتم تحديث الطلب. تأكد من تسجيل الدخول بحساب المدير وأن صلاحيات الإدارة مفعّلة.');
-  showMessage('managerMessage','تم حفظ الطلب وتحديث بياناته بنجاح.','ok');
+  showMessage('managerMessage',current.manager_status==='pending'?'تم حفظ الطلب وقبوله إداريًا ونقله إلى الطلبات المقبولة.':'تم حفظ بيانات الطلب بنجاح.','ok');
   await loadManagerOrders();
+  if(window.__elmagikRefreshWorkflow)await window.__elmagikRefreshWorkflow();
  }catch(err){
   console.error('ELmagik save manager order failed:',err);
   showMessage('managerMessage','تعذر حفظ الطلب: '+(err?.message||'حدث خطأ غير معروف. حاول مرة أخرى.'),'err');
