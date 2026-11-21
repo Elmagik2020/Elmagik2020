@@ -137,6 +137,6 @@ a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}.
 <script>
 const $=id=>document.getElementById(id);
 function calculateBTU(){let l=Number($('length').value),w=Number($('width').value),f=Number($('factor').value);if(!(l>0&&w>0)){alert('من فضلك أدخل أبعادًا صحيحة');return}let b=l*w*f;$('btu').textContent=Math.round(b).toLocaleString('en-US');$('hp').textContent=(b/8000).toFixed(1);$('ton').textContent=(b/12000).toFixed(2);$('calcResult').classList.remove('hide')}
-$('contactForm').addEventListener('submit',e=>{e.preventDefault();let msg=`طلب خدمة جديد%0Aالاسم: ${encodeURIComponent($('cName').value)}%0Aالهاتف: ${encodeURIComponent($('cPhone').value)}%0Aالخدمة: ${encodeURIComponent($('cService').value)}%0Aالتفاصيل: ${encodeURIComponent($('cDetails').value)}`;window.open('https://wa.me/201092909037?text='+msg,'_blank')});
+$('contactForm').addEventListener('submit',e=>{e.preventDefault();let msg=`طلب خدمة جديد%0Aالاسم: ${encodeURIComponent($('cName').value)}%0Aالهاتف: ${encodeURIComponent($('cPhone').value)}%0Aالخدمة: ${encodeURIComponent($('cService').value)}%0Aالتفاصيل: ${encodeURIComponent($('cDetails').value)}`;const waBase=(document.querySelector('.float-wa')?.getAttribute('href')||'https://wa.me/201092909037').split('?')[0];window.open(waBase+'?text='+msg,'_blank','noopener')});
 </script>
 <script type="module" src="./admin.js"></script></body></html>

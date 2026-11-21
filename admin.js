@@ -45,7 +45,7 @@ function resolveAdminEmail(value){
  if(v.includes('@'))return v;
  const digits=v.replace(/\D/g,'');
  // رقم الهاتف المسجل كاختصار للدخول، بينما المصادقة الفعلية تتم بحساب Gmail المرتبط.
- if(['20120489622','0120489622','+20120489622'].includes(digits)||digits==='20120489622')return 'elmagikcool@gmail.com';
+ if(['201020489622','01020489622'].includes(digits))return 'elmagikcool@gmail.com';
  return '';
 }
 function validNewPassword(a,b){
@@ -98,6 +98,7 @@ window.adminSignOut = async () => {
 };
 async function showAdmin(){
  const {data:{user}}=await supabase.auth.getUser(); currentUser=user;
+ if(!user){$('loginMsg').textContent='انتهت الجلسة. سجّل الدخول مرة أخرى.';return;}
  const {data:admin,error}=await supabase.from('admins').select('user_id').eq('user_id',user.id).maybeSingle();
  if(error||!admin){await supabase.auth.signOut();$('loginMsg').textContent='هذا الحساب غير مصرح له بإدارة الموقع.';return;}
  $('adminLogin').classList.add('hide'); $('adminPanel').classList.remove('hide');
@@ -126,7 +127,7 @@ async function loadPublicData(){
   list.innerHTML='';
   (reviews||[]).forEach(r=>{
    const el=document.createElement('article');el.className='review';
-   const stars=document.createElement('div');stars.className='stars';stars.textContent='★'.repeat(r.rating)+'☆'.repeat(5-r.rating);
+   const stars=document.createElement('div');stars.className='stars';const rt=Math.min(5,Math.max(0,Math.round(Number(r.rating))||0));stars.textContent='★'.repeat(rt)+'☆'.repeat(5-rt);
    const p=document.createElement('p');p.textContent=r.comment;
    const b=document.createElement('b');b.textContent=r.name;
    const small=document.createElement('small');small.textContent='عميل';
@@ -294,6 +295,8 @@ async function removeGalleryImage(path){
  const {error}=await supabase.storage.from('site-media').remove([path]);
  if(error){$('adminMsg').textContent='تعذر حذف ملف الصورة من التخزين.';return;}
  settings.gallery=(settings.gallery||[]).filter(x=>x!==path);
+ const fp=(path.match(/^gallery\/\d+-\d+-([0-9a-f]{12})-/)||[])[1];
+ if(fp&&Array.isArray(settings.galleryHashes))settings.galleryHashes=settings.galleryHashes.filter(h=>!String(h).startsWith(fp));
  const saved=await supabase.from('site_settings').update({config:settings,updated_at:new Date().toISOString()}).eq('id',1);
  if(saved.error){$('adminMsg').textContent='حذفت الصورة من التخزين لكن تعذر تحديث إعدادات المعرض.';return;}
  applySettings();renderGalleryManager();$('adminMsg').textContent='تم حذف الصورة من المعرض.';
@@ -332,7 +335,7 @@ window.saveSettings=async()=>{
   if(invalid){$('adminMsg').textContent=`الملف ${invalid.name} ليس صورة أو حجمه أكبر من 6 ميجابايت.`;return;}
   settings.gallery=[...new Set(settings.gallery||[])];
   settings.galleryHashes=Array.isArray(settings.galleryHashes)?settings.galleryHashes:[];
-  const seen=new Set(settings.galleryHashes);let uploaded=0,skipped=0;
+  const seen=new Set(settings.galleryHashes);let uploaded=0,skipped=0,uploadFailure='';
   for(let i=0;i<files.length;i++){
    const f=files[i];
    let fingerprint;
@@ -343,7 +346,7 @@ window.saveSettings=async()=>{
    const safeName=f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
    const path=`gallery/${Date.now()}-${i}-${fingerprint.slice(0,12)}-${safeName}`;
    const up=await supabase.storage.from('site-media').upload(path,f,{upsert:false,contentType:f.type});
-   if(up.error){$('adminMsg').textContent=`تم رفع ${uploaded} صورة وتجاوز ${skipped} مكررة. فشل رفع ${f.name}: ${up.error.message}`;return;}
+   if(up.error){seen.delete(fingerprint);uploadFailure=`تم رفع ${uploaded} صورة وتجاوز ${skipped} مكررة. فشل رفع ${f.name}: ${up.error.message}`;break;}
    settings.gallery.push(path);settings.galleryHashes.push(fingerprint);uploaded++;
    $('adminMsg').textContent=`تم رفع ${uploaded} من ${files.length-skipped} صورة جديدة...`;
   }
@@ -351,6 +354,6 @@ window.saveSettings=async()=>{
   const {error}=await supabase.from('site_settings').update({config:settings,updated_at:new Date().toISOString()}).eq('id',1);
   if(error){$('adminMsg').textContent='تعذر حفظ الإعدادات في قاعدة البيانات.';return;}
   applySettings();renderGalleryManager();
-  $('adminMsg').textContent=`تم حفظ الإعدادات وتطبيقها على الموقع. رُفعت ${uploaded} صورة جديدة${skipped?` وتم تجاهل ${skipped} صورة مكررة`:''}.`;
+  $('adminMsg').textContent=uploadFailure?`تم حفظ الإعدادات والصور التي رُفعت قبل الخطأ. ${uploadFailure}`:`تم حفظ الإعدادات وتطبيقها على الموقع. رُفعت ${uploaded} صورة جديدة${skipped?` وتم تجاهل ${skipped} صورة مكررة`:''}.`;
  } finally {savingSettings=false;if(saveButton)saveButton.disabled=false;}
 };

@@ -44,5 +44,5 @@
 إعداد استعادة كلمة المرور في Supabase:
 1) من Authentication ثم URL Configuration، أضف رابط الموقع المنشور `https://elmagikcool.vercel.app/` إلى Redirect URLs (مع المسار نفسه إن كان الموقع داخل مسار فرعي).
 2) تأكد أن Site URL مضبوط على `https://elmagikcool.vercel.app/`.
-3) يجب أن يكون بريد المدير `abdallahradwan1992@gmail.com` قادرًا على استقبال رسائل Supabase. إذا ظهر email rate limit exceeded، انتظر حتى تنتهي مهلة الحد أو اضبط مزود SMTP موثوقًا من إعدادات Authentication.
+3) يجب أن يكون بريد المدير `elmagikcool@gmail.com` قادرًا على استقبال رسائل Supabase. إذا ظهر email rate limit exceeded، انتظر حتى تنتهي مهلة الحد أو اضبط مزود SMTP موثوقًا من إعدادات Authentication.
 4) رابط الاستعادة صالح حسب إعدادات انتهاء صلاحية روابط البريد في Supabase. بعد فتحه سيظهر نموذج تعيين كلمة المرور الجديدة داخل الموقع.

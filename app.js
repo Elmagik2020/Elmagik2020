@@ -100,6 +100,8 @@ $('technicianApplicationForm').addEventListener('submit',async e=>{
   const experience=Number($('joinExperience').value);
   if(!Number.isInteger(experience)||experience<0||experience>60)throw new Error('أدخل عدد سنوات خبرة صحيحًا.');
   let {data:{session}}=await db.auth.getSession();
+  // لو فيه جلسة محفوظة لحساب آخر (مثلاً المدير) لا نستخدمها لتقديم طلب الفني.
+  if(session&&session.user?.email?.toLowerCase()!==email){await db.auth.signOut();session=null;}
   if(!session){
    const signup=await db.auth.signUp({email,password,options:{data:{display_name:$('joinName').value.trim()}}});
    if(signup.error){

@@ -1,7 +1,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 const supabase = window.__elmagikSupabase || createClient(
-  'https://ehswwwhonicinexutzruo.supabase.co',
+  'https://ehswwhonicinexutzruo.supabase.co',
   'sb_publishable_bTedgB2z-k0bFylHHRucTw_1nE6eESZ',
   { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'elmagik-cool-auth' } }
 );
@@ -11,6 +11,8 @@ let currentChatOrder = null;
 let chatChannel = null;
 let managerFilter = 'pending';
 
+const STATUS_AR={new:'طلب جديد',assigned:'تم إسناد فني',accepted:'الفني وافق على الطلب',in_progress:'جارٍ التنفيذ',completed:'تم الإنجاز',cancelled:'ملغي'};
+const ROLE_AR={admin:'الإدارة',technician:'الفني'};
 function note(id, text, kind='') {
   const el = $(id);
   if (!el) return;
@@ -115,7 +117,7 @@ async function loadCustomerOrders() {
   $('customerOrdersPanel').classList.remove('hide'); $('customerChatPanel').classList.add('hide');
   const root = $('customerOrdersList');
   if (!data?.length) { root.innerHTML = '<p class="small">لا توجد طلبات مرتبطة بهذا الرقم. تأكد أنك استخدمت نفس رقم الموبايل عند إنشاء الطلب.</p>'; return; }
-  root.innerHTML = data.map(o => `<article class="order-card"><div class="order-head"><b>${esc(o.display_code)} · ${esc(o.service_name)}</b><span class="pill">${o.manager_status==='completed'?'مكتمل ومؤرشف':o.manager_status==='accepted'?'مقبول من الإدارة':'بانتظار قبول الإدارة'}</span></div><p>${esc(o.category)} · ${esc(o.status)}</p><p>السعر: ${o.quoted_price==null?'لم يحدد بعد':esc(o.quoted_price)+' جنيه'}</p><p>${esc(o.admin_note||'')}</p><button class="btn" data-customer-open-chat="${esc(o.id)}" data-code="${esc(o.display_code)}">فتح المحادثة مع الإدارة</button></article>`).join('');
+  root.innerHTML = data.map(o => `<article class="order-card"><div class="order-head"><b>${esc(o.display_code)} · ${esc(o.service_name)}</b><span class="pill">${o.manager_status==='completed'?'مكتمل ومؤرشف':o.manager_status==='accepted'?'مقبول من الإدارة':'بانتظار قبول الإدارة'}</span></div><p>${esc(o.category)} · ${esc(STATUS_AR[o.status]||o.status)}</p><p>السعر: ${o.quoted_price==null?'لم يحدد بعد':esc(o.quoted_price)+' جنيه'}</p><p>${esc(o.admin_note||'')}</p><button class="btn" data-customer-open-chat="${esc(o.id)}" data-code="${esc(o.display_code)}">فتح المحادثة مع الإدارة</button></article>`).join('');
   root.querySelectorAll('[data-customer-open-chat]').forEach(b => b.addEventListener('click',()=>openChat(b.dataset.customerOpenChat,b.dataset.code,'customer')));
 }
 async function openChat(orderId, code, role) {
@@ -134,9 +136,9 @@ function appendMessage(m) {
   const root=$('customerChatMessages'); if (!root) return;
   if (root.querySelector('[data-message-id="'+m.id+'"]')) return;
   const item=document.createElement('div');
-  item.className='wf-msg '+(m.sender_role==='admin'?'admin':'customer');
+  item.className='wf-msg '+(m.sender_role==='customer'?'customer':'admin');
   item.dataset.messageId=m.id;
-  item.innerHTML='<div>'+esc(m.body)+'</div><div class="wf-meta">'+(m.sender_role==='admin'?'الإدارة':'أنت')+' · '+esc(new Date(m.created_at).toLocaleString('ar-EG'))+'</div>';
+  item.innerHTML='<div>'+esc(m.body)+'</div><div class="wf-meta">'+(ROLE_AR[m.sender_role]||'أنت')+' · '+esc(new Date(m.created_at).toLocaleString('ar-EG'))+'</div>';
   root.appendChild(item); root.scrollTop=root.scrollHeight;
 }
 async function refreshMessages() {
@@ -150,9 +152,11 @@ async function sendCustomerMessage(e) {
   e.preventDefault(); if(!currentChatOrder) return;
   const body=$('customerChatText').value.trim(); if(!body) return;
   const {data:{user}}=await supabase.auth.getUser();
+  if(!user){note('customerOtpMessage','انتهت الجلسة. سجّل الدخول مرة أخرى.','err');return;}
   const {error}=await supabase.from('order_messages').insert({order_id:currentChatOrder.id,sender_id:user.id,sender_role:'customer',body});
   if(error){note('customerOtpMessage','تعذر إرسال الرسالة: '+error.message,'err');return;}
   $('customerChatText').value='';
+  await refreshMessages();
 }
 function closeChannel(){ if(chatChannel){supabase.removeChannel(chatChannel);chatChannel=null;} }
 async function customerLogout() {
@@ -191,7 +195,7 @@ async function loadWorkflowOrders() {
   if(error){root.textContent='تعذر تحميل الطلبات: '+error.message;return;}
   const rows=(data||[]).filter(o=>managerFilter==='all'||o.manager_status===managerFilter);
   if(!rows.length){root.innerHTML='<p class="small">لا توجد طلبات في هذا القسم.</p>';return;}
-  root.innerHTML=rows.map(o=>`<article class="order-card"><div class="order-head"><b>${esc(o.display_code)} · ${esc(o.customer_name)}</b><span class="pill">${o.manager_status==='completed'?'مكتمل / مؤرشف':o.manager_status==='accepted'?'مقبول إداريًا':'جديد'}</span></div><p>${esc(o.service_name)} · ${esc(o.category)}</p><p>الهاتف: ${esc(o.customer_phone)} · حالة الفني: ${esc(o.status)}</p><p>السعر: ${o.quoted_price==null?'غير محدد':esc(o.quoted_price)+' جنيه'} · ${esc(o.admin_note||'')}</p><div class="wf-actions">${o.manager_status==='pending'?'<button class="btn green" data-manager-accept="'+esc(o.id)+'">قبول الطلب</button>':''}${o.manager_status!=='completed'?'<button class="btn" data-manager-complete="'+esc(o.id)+'">تم الإنجاز والأرشفة</button>':''}<button class="btn alt" data-manager-chat="'+esc(o.id)+'" data-code="'+esc(o.display_code)+'">محادثة العميل</button></div></article>`).join('');
+  root.innerHTML=rows.map(o=>`<article class="order-card"><div class="order-head"><b>${esc(o.display_code)} · ${esc(o.customer_name)}</b><span class="pill">${o.manager_status==='completed'?'مكتمل / مؤرشف':o.manager_status==='accepted'?'مقبول إداريًا':'جديد'}</span></div><p>${esc(o.service_name)} · ${esc(o.category)}</p><p>الهاتف: ${esc(o.customer_phone)} · حالة الفني: ${esc(STATUS_AR[o.status]||o.status)}</p><p>السعر: ${o.quoted_price==null?'غير محدد':esc(o.quoted_price)+' جنيه'} · ${esc(o.admin_note||'')}</p><div class="wf-actions">${o.manager_status==='pending'?'<button class="btn green" data-manager-accept="'+esc(o.id)+'">قبول الطلب</button>':''}${o.manager_status!=='completed'?'<button class="btn" data-manager-complete="'+esc(o.id)+'">تم الإنجاز والأرشفة</button>':''}<button class="btn alt" data-manager-chat="'+esc(o.id)+'" data-code="'+esc(o.display_code)+'">محادثة العميل</button></div></article>`).join('');
   root.querySelectorAll('[data-manager-accept]').forEach(b=>b.addEventListener('click',()=>setManagerStatus(b.dataset.managerAccept,'accepted')));
   root.querySelectorAll('[data-manager-complete]').forEach(b=>b.addEventListener('click',()=>setManagerStatus(b.dataset.managerComplete,'completed')));
   root.querySelectorAll('[data-manager-chat]').forEach(b=>b.addEventListener('click',()=>openManagerChat(b.dataset.managerChat,b.dataset.code)));
@@ -208,7 +212,7 @@ async function setManagerStatus(id,status) {
     const {data:admin,error:adminError}=await supabase.from('admins').select('user_id').eq('user_id',user.id).maybeSingle();
     if(adminError) throw adminError;
     if(!admin) throw new Error('الحساب الحالي لا يملك صلاحية اعتماد الطلبات.');
-    const patch=status==='accepted'?{manager_status:'accepted',accepted_at:new Date().toISOString()}:{manager_status:'completed',manager_completed_at:new Date().toISOString(),archived_at:new Date().toISOString()};
+    const patch=status==='accepted'?{manager_status:'accepted',accepted_at:new Date().toISOString()}:{status:'completed',manager_status:'completed',manager_completed_at:new Date().toISOString(),archived_at:new Date().toISOString()};
     const {data,error}=await supabase.from('service_orders').update(patch).eq('id',id).select('id').maybeSingle();
     if(error) throw error;
     if(!data) throw new Error('لم يتم تحديث الطلب. تحقق من صلاحية المدير ثم أعد المحاولة.');
@@ -251,8 +255,8 @@ async function openManagerChat(id,code) {
 }
 function appendManagerMessage(m) {
   const root=$('managerChatMessages');if(!root||root.querySelector('[data-message-id="'+m.id+'"]'))return;
-  const item=document.createElement('div');item.className='wf-msg '+(m.sender_role==='admin'?'admin':'customer');item.dataset.messageId=m.id;
-  item.innerHTML='<div>'+esc(m.body)+'</div><div class="wf-meta">'+(m.sender_role==='admin'?'الإدارة':'العميل')+' · '+esc(new Date(m.created_at).toLocaleString('ar-EG'))+'</div>';
+  const item=document.createElement('div');item.className='wf-msg '+(m.sender_role==='customer'?'customer':'admin');item.dataset.messageId=m.id;
+  item.innerHTML='<div>'+esc(m.body)+'</div><div class="wf-meta">'+(ROLE_AR[m.sender_role]||'العميل')+' · '+esc(new Date(m.created_at).toLocaleString('ar-EG'))+'</div>';
   root.appendChild(item);root.scrollTop=root.scrollHeight;
 }
 async function refreshManagerMessages() {
@@ -269,9 +273,11 @@ async function sendAdminMessage(e) {
   e.preventDefault();if(!currentChatOrder)return;
   const body=$('managerChatText').value.trim();if(!body)return;
   const {data:{user}}=await supabase.auth.getUser();
+  if(!user){alert('انتهت جلسة المدير. سجّل الدخول مرة أخرى.');return;}
   const {error}=await supabase.from('order_messages').insert({order_id:currentChatOrder.id,sender_id:user.id,sender_role:'admin',body});
   if(error){alert('تعذر إرسال الرد: '+error.message);return;}
   $('managerChatText').value='';
+  try{await refreshManagerMessages();}catch(_){}
 }
 async function detectAdminSession() {
   const {data:{session}}=await supabase.auth.getSession();
