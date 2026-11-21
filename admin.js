@@ -102,6 +102,7 @@ async function showAdmin(){
  const {data:admin,error}=await supabase.from('admins').select('user_id').eq('user_id',user.id).maybeSingle();
  if(error||!admin){await supabase.auth.signOut();$('loginMsg').textContent='هذا الحساب غير مصرح له بإدارة الموقع.';return;}
  $('adminLogin').classList.add('hide'); $('adminPanel').classList.remove('hide');
+ if(window.adminTab)window.adminTab('look');
  $('bgColor').value=settings.bg; $('accentColor').value=settings.accent;
  $('editHeroTitle').value=settings.content?.heroTitle || $('siteHeroTitle').innerText;
  $('editPhone').value=settings.content?.phone || '01092909037';
@@ -209,6 +210,7 @@ async function renderModeration(){
  const {data,error}=await supabase.from('reviews').select('id,name,rating,comment,created_at').eq('status','pending').order('created_at',{ascending:false});
  if(error){$('adminMsg').textContent='تعذر تحميل التقييمات الجديدة.';return;}
  $('moderationList').innerHTML='';
+ const pb=$('pendingBadge');if(pb){pb.textContent=data?.length||'';pb.classList.toggle('hide',!data?.length);}
  (data||[]).forEach(r=>{
   const card=document.createElement('div');card.className='review';
   const stars=document.createElement('div');stars.className='stars';stars.textContent='★'.repeat(r.rating);
@@ -304,7 +306,7 @@ async function removeGalleryImage(path){
 window.saveSettings=async()=>{
  if(!currentUser||savingSettings)return;
  savingSettings=true;
- const saveButton=document.querySelector('.admin-actions .btn:not(.outline)');
+ const saveButton=$('saveAllBtn');
  if(saveButton)saveButton.disabled=true;
  try{
   $('adminMsg').textContent='جارٍ حفظ التعديلات ورفع الصور...';

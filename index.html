@@ -40,6 +40,15 @@ a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}.
 @media(max-width:900px){#userGallery{grid-template-columns:repeat(var(--gallery-tablet-cols,3),minmax(0,1fr))}#userGallery.gallery-masonry{column-count:var(--gallery-tablet-cols,3)}}
 @media(max-width:560px){#userGallery{grid-template-columns:repeat(var(--gallery-mobile-cols,3),minmax(0,1fr));gap:var(--gallery-gap,8px)}#userGallery.gallery-masonry{column-count:var(--gallery-mobile-cols,3)}#userGallery .work-card img{height:var(--gallery-height-mobile,110px)}#userGallery.gallery-slider .work-card{flex-basis:min(190px,72vw)}}
 
+.admin-tabs{position:sticky;top:0;z-index:5;display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px;margin:12px 0 16px;padding:8px 0;background:#062957}
+.admin-tab{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 6px;border:1px solid #078ed2;border-radius:14px;background:#04204a;color:#cfeeff;font-weight:800;font-size:12px;cursor:pointer}
+.admin-tab i{font-size:20px}
+.admin-tab.active{background:linear-gradient(100deg,#08c8ee,#087be8);color:#001a36;border-color:transparent}
+.tab-badge{position:absolute;top:4px;left:6px;min-width:18px;padding:1px 5px;border-radius:10px;background:#ff5a5f;color:#fff;font-size:11px;font-style:normal;font-weight:900}
+.admin-sec h3:first-child{margin-top:4px}
+.admin-bar{position:sticky;bottom:0;z-index:5;margin-top:18px;padding:10px 0 2px;background:#062957;border-top:1px solid #0b94d2}
+.admin-bar .hint{margin:0 0 6px;min-height:1.2em}
+.admin-bar .admin-actions{margin-top:0}
 </style>
 </head>
 <body>
@@ -89,13 +98,9 @@ a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}.
 </div>
 <p id="loginMsg" class="hint"></p></div>
 <div id="adminPanel" class="hide"><p class="hint">أنت مسجل الدخول كمدير. التعديلات تحفظ في قاعدة البيانات وتظهر للزوار بعد تحديث الصفحة.</p>
-<h3>تغيير كلمة مرور المدير</h3>
-<div class="admin-grid">
- <div class="field"><label>كلمة المرور الجديدة</label><input id="changePassword" type="password" minlength="8" autocomplete="new-password" placeholder="8 أحرف على الأقل"></div>
- <div class="field"><label>تأكيد كلمة المرور الجديدة</label><input id="changePasswordConfirm" type="password" minlength="8" autocomplete="new-password"></div>
-</div>
-<div class="admin-actions"><button class="btn outline" type="button" onclick="adminChangePassword()">حفظ كلمة المرور الجديدة</button></div>
-<div class="admin-grid"><div class="field"><label>لون خلفية الموقع</label><input type="color" id="bgColor" value="#031b3b"></div><div class="field"><label>لون الإضاءة الرئيسية</label><input type="color" id="accentColor" value="#08c9f2"></div><div class="field"><label>تغيير صورة الواجهة الرئيسية</label><input type="file" id="heroUpload" accept="image/*"></div><div class="field"><label>إضافة صورة إلى معرض الأعمال</label><input type="file" id="galleryUpload" accept="image/*" multiple><small class="hint">يمكنك تحديد صور كثيرة مرة واحدة. الحد الأقصى 6 ميجابايت للصورة.</small></div></div><h3>إعدادات عرض معرض الصور</h3><p class="hint">غيّر طريقة عرض الصور وعدد الأعمدة وأحجامها. الإعدادات تُحفظ وتظهر لكل زوار الموقع.</p><div class="admin-grid">
+<nav class="admin-tabs" aria-label="أقسام لوحة الإدارة"><button type="button" class="admin-tab active" data-tab="look" onclick="adminTab('look')"><i class="fa-solid fa-palette"></i><span>المظهر</span></button><button type="button" class="admin-tab" data-tab="gallery" onclick="adminTab('gallery')"><i class="fa-solid fa-images"></i><span>المعرض</span></button><button type="button" class="admin-tab" data-tab="featured" onclick="adminTab('featured')"><i class="fa-solid fa-image"></i><span>الصور الرئيسية</span></button><button type="button" class="admin-tab" data-tab="content" onclick="adminTab('content')"><i class="fa-solid fa-pen-to-square"></i><span>المحتوى</span></button><button type="button" class="admin-tab" data-tab="reviews" onclick="adminTab('reviews')"><i class="fa-solid fa-star"></i><span>التقييمات</span><em id="pendingBadge" class="tab-badge hide"></em></button><button type="button" class="admin-tab" data-tab="privacy" onclick="adminTab('privacy')"><i class="fa-solid fa-lock"></i><span>الخصوصية</span></button></nav>
+<section class="admin-sec" id="sec-look"><h3>المظهر العام</h3><div class="admin-grid"><div class="field"><label>لون خلفية الموقع</label><input type="color" id="bgColor" value="#031b3b"></div><div class="field"><label>لون الإضاءة الرئيسية</label><input type="color" id="accentColor" value="#08c9f2"></div><div class="field" style="grid-column:1/-1"><label>تغيير صورة الواجهة الرئيسية</label><input type="file" id="heroUpload" accept="image/*"></div></div></section>
+<section class="admin-sec hide" id="sec-gallery"><h3>إضافة صور إلى معرض الأعمال</h3><div class="field"><label>اختر الصور</label><input type="file" id="galleryUpload" accept="image/*" multiple><small class="hint">يمكنك تحديد صور كثيرة مرة واحدة. الحد الأقصى 6 ميجابايت للصورة. اضغط «حفظ كل التعديلات» لرفعها.</small></div><h3>إعدادات عرض معرض الصور</h3><p class="hint">غيّر طريقة عرض الصور وعدد الأعمدة وأحجامها. الإعدادات تُحفظ وتظهر لكل زوار الموقع.</p><div class="admin-grid">
  <div class="field"><label>طريقة العرض</label><select id="galleryMode"><option value="grid">شبكة منتظمة</option><option value="masonry">صور بأطوال مختلفة (Masonry)</option><option value="slider">شريط أفقي قابل للسحب</option></select></div>
  <div class="field"><label>ملاءمة الصورة داخل الإطار</label><select id="galleryFit"><option value="cover">ملء الإطار مع قص بسيط</option><option value="contain">إظهار الصورة كاملة</option></select></div>
  <div class="field"><label>عدد الأعمدة — الكمبيوتر</label><select id="galleryDesktopCols"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option></select></div>
@@ -107,14 +112,17 @@ a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}.
  <div class="field"><label>استدارة الحواف (بكسل)</label><input id="galleryRadius" type="number" min="0" max="40" value="13"></div>
 </div>
 <div class="admin-actions"><button class="btn outline" type="button" onclick="previewGallerySettings()">معاينة طريقة العرض</button></div>
-<h3>التحكم في الصور الثلاث الرئيسية</h3>
+<h3>معرض الصور — حذف الصور المضافة</h3><div class="admin-actions"><button class="btn outline" type="button" onclick="scanGalleryDuplicates()">فحص الصور المكررة وتنظيف المعرض</button></div><div id="galleryManager" class="review-grid"></div>
+</section>
+<section class="admin-sec hide" id="sec-featured"><h3>التحكم في الصور الثلاث الرئيسية</h3>
 <p class="hint">يمكنك استبدال كل صورة على حدة، وتعديل عنوانها، أو إخفاؤها من واجهة الموقع. اترك اختيار الصورة فارغًا للاحتفاظ بالصورة الحالية.</p>
 <div class="featured-admin-grid">
  <div class="featured-admin-card"><img id="featuredPreview1" src="assets/work-control.jpg" alt="معاينة الصورة الأولى"><b>الصورة الرئيسية الأولى</b><div class="field"><label>عنوان الصورة</label><input id="featuredTitle1" maxlength="90" value="قسم لوحات الكنترول والـ PLC"></div><div class="field"><label>استبدال الصورة</label><input id="featuredUpload1" type="file" accept="image/*"></div><label class="featured-visible"><input id="featuredVisible1" type="checkbox" checked> إظهار الصورة</label></div>
  <div class="featured-admin-card"><img id="featuredPreview2" src="assets/work-install.jpg" alt="معاينة الصورة الثانية"><b>الصورة الرئيسية الثانية</b><div class="field"><label>عنوان الصورة</label><input id="featuredTitle2" maxlength="90" value="فريق الصيانة والتركيبات"></div><div class="field"><label>استبدال الصورة</label><input id="featuredUpload2" type="file" accept="image/*"></div><label class="featured-visible"><input id="featuredVisible2" type="checkbox" checked> إظهار الصورة</label></div>
  <div class="featured-admin-card"><img id="featuredPreview3" src="assets/work-factory.jpg" alt="معاينة الصورة الثالثة"><b>الصورة الرئيسية الثالثة</b><div class="field"><label>عنوان الصورة</label><input id="featuredTitle3" maxlength="90" value="طوارئ المصانع والمطاعم"></div><div class="field"><label>استبدال الصورة</label><input id="featuredUpload3" type="file" accept="image/*"></div><label class="featured-visible"><input id="featuredVisible3" type="checkbox" checked> إظهار الصورة</label></div>
 </div>
-<h3>إدارة محتوى الموقع</h3>
+</section>
+<section class="admin-sec hide" id="sec-content"><h3>إدارة محتوى الموقع</h3>
 <div class="admin-grid">
  <div class="field"><label>العنوان الرئيسي</label><input id="editHeroTitle" maxlength="180" placeholder="العنوان الرئيسي"></div>
  <div class="field"><label>رقم الهاتف المعروض</label><input id="editPhone" maxlength="30" placeholder="رقم الهاتف"></div>
@@ -122,9 +130,8 @@ a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}.
  <div class="field"><label>رابط صفحة فيسبوك</label><input id="editFacebook" type="url" placeholder="https://www.facebook.com/..."></div>
  <div class="field" style="grid-column:1/-1"><label>عنوان الشركة</label><input id="editAddress" maxlength="250"></div>
 </div>
-<div class="admin-actions"><button class="btn" onclick="saveSettings()">حفظ كل التعديلات للجميع</button><button class="btn outline" onclick="adminSignOut()">تسجيل الخروج</button></div>
-<h3>معرض الصور — حذف الصور المضافة</h3><div class="admin-actions"><button class="btn outline" type="button" onclick="scanGalleryDuplicates()">فحص الصور المكررة وتنظيف المعرض</button></div><div id="galleryManager" class="review-grid"></div>
-<h3>إضافة تقييم باسم العميل</h3>
+</section>
+<section class="admin-sec hide" id="sec-reviews"><h3>إضافة تقييم باسم العميل</h3>
 <div class="admin-grid">
  <div class="field"><label>اسم العميل</label><input id="adminReviewName" maxlength="60"></div>
  <div class="field"><label>التقييم</label><select id="adminReviewRating"><option value="5">5 نجوم</option><option value="4">4 نجوم</option><option value="3">3 نجوم</option><option value="2">نجمتان</option><option value="1">نجمة</option></select></div>
@@ -133,9 +140,18 @@ a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}.
 <div class="admin-actions"><button class="btn" onclick="addAdminReview()">إضافة ونشر التقييم</button></div>
 <h3>تقييمات العملاء الجديدة — بانتظار موافقتك</h3><div id="moderationList" class="review-grid"></div>
 <h3>التقييمات المنشورة</h3><div id="publishedAdminList" class="review-grid"></div>
-<p id="adminMsg" class="hint"></p></div></div></div>
+</section>
+<section class="admin-sec hide" id="sec-privacy"><h3>تغيير كلمة مرور المدير</h3>
+<div class="admin-grid">
+ <div class="field"><label>كلمة المرور الجديدة</label><input id="changePassword" type="password" minlength="8" autocomplete="new-password" placeholder="8 أحرف على الأقل"></div>
+ <div class="field"><label>تأكيد كلمة المرور الجديدة</label><input id="changePasswordConfirm" type="password" minlength="8" autocomplete="new-password"></div>
+</div>
+<div class="admin-actions"><button class="btn outline" type="button" onclick="adminChangePassword()">حفظ كلمة المرور الجديدة</button></div>
+<h3>الجلسة</h3><div class="admin-actions"><button class="btn outline" type="button" onclick="adminSignOut()"><i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج</button></div></section>
+<div class="admin-bar"><p id="adminMsg" class="hint"></p><div class="admin-actions"><button class="btn" id="saveAllBtn" type="button" onclick="saveSettings()"><i class="fa-solid fa-floppy-disk"></i> حفظ كل التعديلات للجميع</button><button class="btn outline" type="button" onclick="adminSignOut()"><i class="fa-solid fa-right-from-bracket"></i> خروج</button></div></div></div></div></div>
 <script>
 const $=id=>document.getElementById(id);
+function adminTab(name){document.querySelectorAll('.admin-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.admin-sec').forEach(x=>x.classList.toggle('hide',x.id!=='sec-'+name));const sv=$('saveAllBtn');if(sv)sv.classList.toggle('hide',name==='reviews'||name==='privacy');const t=document.querySelector('.admin-tabs');if(t)t.scrollIntoView({block:'nearest'});}
 function calculateBTU(){let l=Number($('length').value),w=Number($('width').value),f=Number($('factor').value);if(!(l>0&&w>0)){alert('من فضلك أدخل أبعادًا صحيحة');return}let b=l*w*f;$('btu').textContent=Math.round(b).toLocaleString('en-US');$('hp').textContent=(b/8000).toFixed(1);$('ton').textContent=(b/12000).toFixed(2);$('calcResult').classList.remove('hide')}
 $('contactForm').addEventListener('submit',e=>{e.preventDefault();let msg=`طلب خدمة جديد%0Aالاسم: ${encodeURIComponent($('cName').value)}%0Aالهاتف: ${encodeURIComponent($('cPhone').value)}%0Aالخدمة: ${encodeURIComponent($('cService').value)}%0Aالتفاصيل: ${encodeURIComponent($('cDetails').value)}`;const waBase=(document.querySelector('.float-wa')?.getAttribute('href')||'https://wa.me/201092909037').split('?')[0];window.open(waBase+'?text='+msg,'_blank','noopener')});
 </script>
