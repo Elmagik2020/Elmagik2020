@@ -315,7 +315,7 @@ async function loadManagerApplications(){
   const {data:admin,error:adminError}=await db.from('admins').select('user_id').eq('user_id',user.id).maybeSingle();
   if(adminError)throw adminError;
   if(!admin)throw new Error('الحساب الحالي غير مصرح له بمراجعة طلبات الفنيين.');
-  const {data,error}=await db.from('technician_applications').select('*').order('created_at',{ascending:false}).limit(100);
+  const {data,error}=await db.from('technician_applications').select('*').eq('status','pending').order('created_at',{ascending:false}).limit(100);
   if(error)throw error;
   if(!data?.length){root.textContent='لا توجد طلبات انضمام حاليًا.';return;}
   const pendingCount=data.filter(a=>a.status==='pending').length;
