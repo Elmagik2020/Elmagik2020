@@ -179,19 +179,36 @@ $('managerForgotBtn').addEventListener('click',async()=>{
  }catch(err){showMessage('managerMessage','تعذر إرسال رابط الاستعادة: '+(err.message||'حاول لاحقًا. إذا ظهر حدّ الإرسال، انتظر قليلًا قبل إعادة المحاولة.'),'err');}
  finally{btn.disabled=false;btn.textContent='إنشاء / استعادة كلمة المرور';}
 });
+let recoveryRole='unknown';
 db.auth.onAuthStateChange((event,session)=>{
  if(event==='PASSWORD_RECOVERY'&&session?.user){
-  setView('manager');
-  $('managerResetPanel').classList.remove('hide');
-  $('managerLogin').classList.add('hide');
-  showMessage('managerResetMessage','تم التحقق من رابط الاستعادة. أدخل كلمة مرور جديدة لا تقل عن 8 أحرف.','ok');
+  Promise.resolve().then(async()=>{
+   recoveryRole='pending';
+   const uid=session.user.id;
+   const {data:admin}=await db.from('admins').select('user_id').eq('user_id',uid).maybeSingle();
+   if(admin) recoveryRole='admin';
+   else {
+    const {data:tech}=await db.from('technicians').select('user_id,active').eq('user_id',uid).maybeSingle();
+    if(tech?.active) recoveryRole='technician';
+   }
+   if(recoveryRole==='admin'){
+    setView('manager');
+    $('managerResetPanel').classList.remove('hide');
+    $('managerLogin').classList.add('hide');
+    showMessage('managerResetMessage','تم التحقق من رابط استعادة حساب الإدارة. أدخل كلمة المرور الجديدة.','ok');
+   }else{
+    setView('technician');
+    $('techResetPanel').classList.remove('hide');
+    $('techLogin').classList.add('hide');
+    showMessage('techResetMessage',recoveryRole==='technician'?'تم التحقق من رابط استعادة حساب الفني. أدخل كلمة المرور الجديدة.':'تم التحقق من الحساب. يمكنك تغيير كلمة المرور، لكن دخول لوحة الفني يظل متوقفًا لحين اعتماد الإدارة.','ok');
+   }
+  }).catch(err=>showMessage('techMessage','تعذر تحديد نوع الحساب: '+(err.message||'حاول مرة أخرى.'),'err'));
  }
 });
-$('managerResetForm').addEventListener('submit',async e=>{
- e.preventDefault();
- const password=$('managerNewPassword').value,confirm=$('managerConfirmPassword').value,btn=$('managerSavePasswordBtn');
- if(password.length<8){showMessage('managerResetMessage','كلمة المرور يجب ألا تقل عن 8 أحرف.','err');return;}
- if(password!==confirm){showMessage('managerResetMessage','تأكيد كلمة المرور غير مطابق.','err');return;}
+async function saveRecoveryPassword(formId,newId,confirmId,buttonId,messageId){
+ const password=$(newId).value,confirm=$(confirmId).value,btn=$(buttonId);
+ if(password.length<8){showMessage(messageId,'كلمة المرور يجب ألا تقل عن 8 أحرف.','err');return;}
+ if(password!==confirm){showMessage(messageId,'تأكيد كلمة المرور غير مطابق.','err');return;}
  btn.disabled=true;btn.textContent='جارٍ حفظ كلمة المرور...';
  try{
   const {data:{user},error}=await db.auth.getUser();
@@ -199,11 +216,20 @@ $('managerResetForm').addEventListener('submit',async e=>{
   const {error:updateError}=await db.auth.updateUser({password});
   if(updateError)throw updateError;
   await db.auth.signOut();
-  $('managerResetForm').reset();$('managerResetPanel').classList.add('hide');$('managerLogin').classList.remove('hide');
-  showMessage('managerMessage','تم حفظ كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول إلى إعدادات الإدارة بالبريد المحدد وكلمة المرور الجديدة.','ok');
- }catch(err){showMessage('managerResetMessage','تعذر حفظ كلمة المرور: '+(err.message||'حاول مرة أخرى.'),'err');}
+  $(formId).reset();
+  if(recoveryRole==='admin'){
+   $('managerResetPanel').classList.add('hide');$('managerLogin').classList.remove('hide');
+   showMessage('managerMessage','تم حفظ كلمة مرور المدير. يمكنك تسجيل الدخول إلى الإدارة.','ok');
+  }else{
+   $('techResetPanel').classList.add('hide');$('techLogin').classList.remove('hide');
+   if(recoveryRole==='technician')showMessage('techMessage','تم حفظ كلمة مرور الفني. سجّل الدخول الآن بالبريد وكلمة المرور الجديدة.','ok');
+   else showMessage('techMessage','تم حفظ كلمة المرور، لكن الحساب غير معتمد بعد. لن تتمكن من دخول لوحة الفني قبل موافقة الإدارة.','err');
+  }
+ }catch(err){showMessage(messageId,'تعذر حفظ كلمة المرور: '+(err.message||'حاول مرة أخرى.'),'err');}
  finally{btn.disabled=false;btn.textContent='حفظ كلمة المرور';}
-});
+}
+$('managerResetForm').addEventListener('submit',e=>{e.preventDefault();saveRecoveryPassword('managerResetForm','managerNewPassword','managerConfirmPassword','managerSavePasswordBtn','managerResetMessage');});
+$('techResetForm').addEventListener('submit',e=>{e.preventDefault();saveRecoveryPassword('techResetForm','techNewPassword','techConfirmPassword','techSavePasswordBtn','techResetMessage');});
 // تغيير كلمة مرور المدير من داخل لوحة الإدارة بعد إعادة التحقق بكلمة المرور الحالية.
 $('managerChangePasswordForm').addEventListener('submit',async e=>{
  e.preventDefault();
