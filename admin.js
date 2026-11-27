@@ -202,8 +202,9 @@ function applySettings(){
   $('userGallery').innerHTML='';
   (settings.gallery||[]).forEach(path=>{
    const card=document.createElement('div');card.className='work-card';
-   const img=document.createElement('img');img.src=publicUrl(path);img.alt='من أعمال الشركة';img.loading='lazy';img.decoding='async';img.fetchPriority='low';
-   const b=document.createElement('b');b.textContent='من أعمالنا';card.append(img,b);$('userGallery').append(card);
+   const img=document.createElement('img');img.src=publicUrl(settings.galleryThumbnails?.[path]||path);img.alt='من أعمال الشركة';img.loading='lazy';img.decoding='async';img.fetchPriority='low';
+   const link=document.createElement('a');link.href=publicUrl(path);link.target='_blank';link.rel='noopener';link.append(img);
+   const b=document.createElement('b');b.textContent='من أعمالنا';card.append(link,b);$('userGallery').append(card);
   });
  }
 }
@@ -271,10 +272,11 @@ function renderGalleryManager(){
  settings.gallery=[...new Set(settings.gallery||[])];
  (settings.gallery||[]).forEach((path,i)=>{
   const item=document.createElement('div');item.className='gallery-admin-item';
-  const img=document.createElement('img');img.src=publicUrl(path);img.alt='صورة المعرض';img.loading='lazy';img.decoding='async';img.fetchPriority='low';
+  const img=document.createElement('img');img.src=publicUrl(settings.galleryThumbnails?.[path]||path);img.alt='صورة المعرض';img.loading='lazy';img.decoding='async';img.fetchPriority='low';
+  const preview=document.createElement('a');preview.href=publicUrl(path);preview.target='_blank';preview.rel='noopener';preview.append(img);
   const label=document.createElement('small');label.textContent=`صورة ${i+1}`;
   const del=document.createElement('button');del.className='btn outline';del.textContent='حذف الصورة';del.onclick=()=>removeGalleryImage(path);
-  item.append(img,label,del);root.append(item);
+  item.append(preview,label,del);root.append(item);
  });
  if(!(settings.gallery||[]).length)root.textContent='لم تتم إضافة صور بعد.';
 }
@@ -309,6 +311,9 @@ async function removeGalleryImage(path){
  if(!confirm('حذف هذه الصورة من معرض الموقع؟'))return;
  const {error}=await supabase.storage.from('site-media').remove([path]);
  if(error){$('adminMsg').textContent='تعذر حذف ملف الصورة من التخزين.';return;}
+ const thumbPath=settings.galleryThumbnails?.[path];
+ if(thumbPath&&thumbPath!==path)await supabase.storage.from('site-media').remove([thumbPath]);
+ if(settings.galleryThumbnails)delete settings.galleryThumbnails[path];
  settings.gallery=(settings.gallery||[]).filter(x=>x!==path);
  const fp=(path.match(/^gallery\/\d+-\d+-([0-9a-f]{12})-/)||[])[1];
  if(fp&&Array.isArray(settings.galleryHashes))settings.galleryHashes=settings.galleryHashes.filter(h=>!String(h).startsWith(fp));
@@ -362,12 +367,21 @@ window.saveSettings=async()=>{
    catch{fingerprint=[f.name,f.size,f.lastModified].join(':');}
    if(seen.has(fingerprint)){skipped++;continue;}
    seen.add(fingerprint);
-   const optimized=await optimizeImageForUpload(f);
+   const optimized=await optimizeImageForUpload(f,1600,0.78);
+   const thumbnail=await optimizeImageForUpload(f,480,0.68);
    const safeName=f.name.replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9._-]/g,'_');
-   const path=`gallery/${Date.now()}-${i}-${fingerprint.slice(0,12)}-${safeName}.${optimized.ext}`;
+   const stamp=Date.now()+'-'+i+'-'+fingerprint.slice(0,12)+'-'+safeName;
+   const path=`gallery/${stamp}.${optimized.ext}`;
    const up=await supabase.storage.from('site-media').upload(path,optimized.blob,{upsert:false,contentType:optimized.contentType});
    if(up.error){seen.delete(fingerprint);uploadFailure=`تم رفع ${uploaded} صورة وتجاوز ${skipped} مكررة. فشل رفع ${f.name}: ${up.error.message}`;break;}
-   settings.gallery.push(path);settings.galleryHashes.push(fingerprint);uploaded++;
+   let thumbnailPath=path;
+   if(thumbnail.blob!==f&&thumbnail.ext==='webp'){
+    thumbnailPath=`gallery-thumbs/${stamp}.webp`;
+    const thumbUp=await supabase.storage.from('site-media').upload(thumbnailPath,thumbnail.blob,{upsert:false,contentType:'image/webp'});
+    if(thumbUp.error){await supabase.storage.from('site-media').remove([path]);seen.delete(fingerprint);uploadFailure=`تعذر إنشاء الصورة المصغرة لـ ${f.name}: ${thumbUp.error.message}`;break;}
+   }
+   settings.gallery.push(path);settings.galleryHashes.push(fingerprint);
+   settings.galleryThumbnails=settings.galleryThumbnails||{};settings.galleryThumbnails[path]=thumbnailPath;uploaded++;
    $('adminMsg').textContent=`تم رفع ${uploaded} من ${files.length-skipped} صورة جديدة...`;
   }
   $('galleryUpload').value='';
