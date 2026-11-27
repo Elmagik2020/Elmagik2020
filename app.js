@@ -13,6 +13,7 @@ const catalog={
 };
 const statusNames={new:'طلب جديد',assigned:'تم إسناد فني',accepted:'الفني وافق على الطلب',in_progress:'جارٍ التنفيذ',completed:'تم الإنجاز',cancelled:'ملغي'};
 let activeUser=null,activeRole=null,technicians=[];
+let technicianApplicationsChannel=null;
 function showMessage(id,msg,type=''){const el=$(id);el.className=type?'notice '+type:'small';el.textContent=msg;}
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function code(){return 'EM-'+Array.from(crypto.getRandomValues(new Uint8Array(4))).map(x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();}
@@ -103,13 +104,16 @@ $('technicianApplicationForm').addEventListener('submit',async e=>{
   // لو فيه جلسة محفوظة لحساب آخر (مثلاً المدير) لا نستخدمها لتقديم طلب الفني.
   if(session&&session.user?.email?.toLowerCase()!==email){await db.auth.signOut();session=null;}
   if(!session){
-   const signup=await db.auth.signUp({email,password,options:{data:{display_name:$('joinName').value.trim()}}});
+   const signup=await db.auth.signUp({email,password,options:{data:{display_name:$('joinName').value.trim()},emailRedirectTo:'https://elmagikcool.vercel.app/app.html'}});
    if(signup.error){
+    const msg=String(signup.error.message||'');
+    const alreadyRegistered=/already registered|already exists|user exists/i.test(msg);
+    if(!alreadyRegistered)throw signup.error;
     const login=await db.auth.signInWithPassword({email,password});
-    if(login.error)throw new Error(signup.error.message.includes('already registered')?'هذا البريد مسجل بالفعل. استخدم بيانات الدخول الصحيحة لإرسال طلبك.':signup.error.message);
+    if(login.error)throw new Error('هذا البريد لديه حساب بالفعل، لكن كلمة المرور المدخلة غير صحيحة أو لم يتم تأكيد البريد. استخدم زر «لدي حساب بالفعل / نسيت كلمة المرور» لاستعادة كلمة المرور، ثم أعد إرسال الطلب. لا تنشئ حسابًا جديدًا.');
     session=login.data.session;
    }else if(!signup.data.session){
-    showMessage('joinMessage','تم إنشاء حساب الدخول. افتح رسالة تأكيد البريد الإلكتروني أولًا، ثم ارجع إلى هذه الصفحة وسجّل بنفس البريد وكلمة المرور واضغط إرسال طلب الانضمام مرة أخرى. لم يتم تفعيل أي صلاحيات فني حتى الآن.','ok');
+    showMessage('joinMessage','تم إنشاء حساب البريد بنجاح، لكن طلب الانضمام لم يُرسل بعد. افتح رسالة تأكيد البريد من صندوق الوارد أو الرسائل غير المرغوب فيها، ثم ارجع إلى صفحة التطبيق وأرسل طلب الانضمام مرة أخرى بنفس البريد وكلمة المرور. لا تعاود إنشاء الحساب.','ok');
     return;
    }else session=signup.data.session;
   }
@@ -133,6 +137,27 @@ $('technicianApplicationForm').addEventListener('submit',async e=>{
  }catch(err){showMessage('joinMessage','تعذر إرسال الطلب: '+(err.message||'حاول مرة أخرى.'),'err');}
  finally{btn.disabled=false;btn.textContent='إرسال طلب الانضمام';}
 });
+$('joinForgotPasswordBtn').addEventListener('click',async()=>{
+ const email=$('joinEmail').value.trim().toLowerCase();
+ if(!email){showMessage('joinMessage','اكتب البريد الإلكتروني أولًا ثم اضغط استعادة كلمة المرور.','err');$('joinEmail').focus();return;}
+ const btn=$('joinForgotPasswordBtn');btn.disabled=true;btn.textContent='جارٍ إرسال رابط الاستعادة...';
+ try{
+  const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:'https://elmagikcool.vercel.app/app.html'});
+  if(error)throw error;
+  showMessage('joinMessage','تم طلب رابط استعادة كلمة المرور للبريد '+email+'. افتح الرسالة، أنشئ كلمة مرور جديدة، ثم ارجع إلى نموذج الانضمام وأكمل إرسال بياناتك وصور البطاقة.','ok');
+ }catch(err){showMessage('joinMessage','تعذر إرسال رابط الاستعادة: '+(err.message||'حاول مرة أخرى بعد قليل.'),'err');}
+ finally{btn.disabled=false;btn.textContent='لدي حساب بالفعل / نسيت كلمة المرور';}
+});
+function watchTechnicianApplications(){
+ if(technicianApplicationsChannel)return;
+ technicianApplicationsChannel=db.channel('elmagik-manager-technician-applications')
+  .on('postgres_changes',{event:'INSERT',schema:'public',table:'technician_applications'},async payload=>{
+   if(activeRole!=='admin')return;
+   const name=payload.new?.display_name||'فني جديد';
+   showMessage('managerMessage','🔔 وصل طلب انضمام جديد من '+name+' — افتح قسم «طلبات الفنيين» لمراجعته.','ok');
+   await loadManagerApplications();
+  }).subscribe();
+}
 async function login(email,password,messageId){
  const {data,error}=await db.auth.signInWithPassword({email:email.trim(),password});
  if(error)throw new Error('بيانات الدخول غير صحيحة أو الحساب غير مفعل.');
@@ -212,6 +237,7 @@ async function restoreSavedSession(){
   const {data:admin,error:adminError}=await db.from('admins').select('user_id').eq('user_id',activeUser.id).maybeSingle();
   if(!adminError&&admin){
    activeRole='admin';$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');
+   watchTechnicianApplications();
    await loadManagerOrders();await loadManagerApplications();if(window.__elmagikRefreshWorkflow)await window.__elmagikRefreshWorkflow();showMessage('managerMessage','تم استعادة جلسة الإدارة المحفوظة على هذا الجهاز.');
    return;
   }
@@ -226,7 +252,7 @@ async function restoreSavedSession(){
 }
 $('managerLoginBtn').addEventListener('click',async()=>{
  const btn=$('managerLoginBtn');btn.disabled=true;
- try{const role=await login($('managerEmail').value,$('managerPassword').value,'managerMessage');if(role!=='admin'){await logout();throw new Error('الحساب ليس حساب مدير.');}$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');await loadManagerOrders();showMessage('managerMessage','تم تسجيل الدخول بنجاح.');await loadManagerApplications();if(window.__elmagikRefreshWorkflow)await window.__elmagikRefreshWorkflow();}
+ try{const role=await login($('managerEmail').value,$('managerPassword').value,'managerMessage');if(role!=='admin'){await logout();throw new Error('الحساب ليس حساب مدير.');}$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');watchTechnicianApplications();await loadManagerOrders();showMessage('managerMessage','تم تسجيل الدخول بنجاح.');await loadManagerApplications();if(window.__elmagikRefreshWorkflow)await window.__elmagikRefreshWorkflow();}
  catch(err){showMessage('managerMessage',err.message,'err');}
  finally{btn.disabled=false;}
 });
@@ -266,6 +292,7 @@ async function loadManagerApplications(){
   const {data,error}=await db.from('technician_applications').select('*').order('created_at',{ascending:false}).limit(100);
   if(error)throw error;
   if(!data?.length){root.textContent='لا توجد طلبات انضمام حاليًا.';return;}
+  const pendingCount=data.filter(a=>a.status==='pending').length;
   const bucket=db.storage.from('technician-id-documents');
   const cards=await Promise.all(data.map(async a=>{
    let frontUrl=null,backUrl=null,frontError=null,backError=null;
@@ -284,7 +311,7 @@ async function loadManagerApplications(){
    };
    return '<article class="order-card"><div class="order-head"><b>'+esc(a.display_name)+'</b><span class="pill">'+(a.status==='pending'?'بانتظار المراجعة':a.status==='approved'?'تم القبول':'مرفوض')+'</span></div><p>البريد: '+esc(a.email)+'<br>الهاتف: '+esc(a.phone)+'<br>المحافظة: '+esc(a.governorate)+' – '+esc(a.area)+'</p><p>الخبرة: '+esc(a.years_experience)+' سنة<br>التخصصات: '+esc((a.specialties||[]).join('، '))+'</p><p>نبذة: '+esc(a.notes||'لا توجد نبذة')+'</p><div style="margin:12px 0"><b>صور بطاقة الرقم القومي</b><div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px"><div style="display:grid;gap:6px;min-width:140px"><b>الوجه الأمامي</b>'+imageView(frontUrl,a.id_front_path,frontError,'الوجه الأمامي')+'</div><div style="display:grid;gap:6px;min-width:140px"><b>الوجه الخلفي</b>'+imageView(backUrl,a.id_back_path,backError,'الوجه الخلفي')+'</div></div></div>'+(a.status==='pending'?'<div class="order-actions"><button class="btn green" type="button" data-approve-tech="'+esc(a.id)+'">قبول وتفعيل الفني</button><button class="btn alt" type="button" data-reject-tech="'+esc(a.id)+'">رفض الطلب</button></div>':'')+'</article>';
   }));
-  root.innerHTML=cards.join('');
+  root.innerHTML=(pendingCount?'<p class="notice ok">🔔 لديك '+pendingCount+' طلب فني بانتظار المراجعة.</p>':'<p class="small">لا توجد طلبات معلّقة للموافقة حاليًا.</p>')+cards.join('');
   root.querySelectorAll('img[data-id-document]').forEach(img=>img.addEventListener('error',()=>{
    const status=root.querySelector('[data-image-status="'+img.dataset.idDocument+'"]');
    if(status)status.textContent='تعذر عرض الصورة داخل الصفحة. استخدم رابط الفتح أعلاه أو أعد تحميل الطلب.';
