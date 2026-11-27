@@ -180,7 +180,7 @@ $('managerForgotBtn').addEventListener('click',async()=>{
  finally{btn.disabled=false;btn.textContent='إنشاء / استعادة كلمة المرور';}
 });
 db.auth.onAuthStateChange((event,session)=>{
- if(event==='PASSWORD_RECOVERY'&&session?.user?.email?.toLowerCase()==='elmagikcool@gmail.com'){
+ if(event==='PASSWORD_RECOVERY'&&session?.user){
   setView('manager');
   $('managerResetPanel').classList.remove('hide');
   $('managerLogin').classList.add('hide');
@@ -195,7 +195,7 @@ $('managerResetForm').addEventListener('submit',async e=>{
  btn.disabled=true;btn.textContent='جارٍ حفظ كلمة المرور...';
  try{
   const {data:{user},error}=await db.auth.getUser();
-  if(error||!user||user.email?.toLowerCase()!=='elmagikcool@gmail.com')throw new Error('رابط الاستعادة غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا.');
+  if(error||!user)throw new Error('رابط الاستعادة غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا.');
   const {error:updateError}=await db.auth.updateUser({password});
   if(updateError)throw updateError;
   await db.auth.signOut();
