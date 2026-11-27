@@ -55,6 +55,16 @@
 <div class="field"><label for="techPassword">كلمة المرور</label><input id="techPassword" type="password" autocomplete="current-password"></div>
 <div class="wide"><button class="btn" id="techLoginBtn">دخول الفني</button></div>
 </div>
+<div id="techResetPanel" class="panel hide" style="margin-top:14px">
+<h2>إنشاء كلمة مرور جديدة</h2>
+<p class="sub">أدخل كلمة المرور الجديدة لحساب الفني.</p>
+<form id="techResetForm" class="grid">
+<div class="field"><label for="techNewPassword">كلمة المرور الجديدة</label><input id="techNewPassword" type="password" minlength="8" required autocomplete="new-password"></div>
+<div class="field"><label for="techConfirmPassword">تأكيد كلمة المرور الجديدة</label><input id="techConfirmPassword" type="password" minlength="8" required autocomplete="new-password"></div>
+<div class="wide"><button class="btn" id="techSavePasswordBtn" type="submit">حفظ كلمة المرور</button></div>
+</form>
+<div id="techResetMessage" class="small" aria-live="polite"></div>
+</div>
 <div id="techDashboard" class="hide"><div class="order-head"><b>الطلبات المسندة إليك</b><button class="btn alt" id="techLogout">تسجيل الخروج</button></div><div id="techOrders"></div></div>
 <div id="techMessage" class="small" aria-live="polite"></div>
 </section>
@@ -103,6 +113,6 @@
 </section>
 <footer class="footer">© ELmagik Cool – حلول التبريد والصيانة والأجهزة المنزلية<br><a href="mailto:elmagikcool@gmail.com">elmagikcool@gmail.com</a></footer>
 </main>
-<script type="module" src="./app.js?v=20261127-3"></script>
+<script type="module" src="./app.js?v=20261127-4"></script>
 <script type="module" src="./workflow.js?v=20261122-1"></script>
 </body></html>
