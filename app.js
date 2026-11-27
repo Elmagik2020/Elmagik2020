@@ -142,7 +142,7 @@ $('joinForgotPasswordBtn').addEventListener('click',async()=>{
  if(!email){showMessage('joinMessage','اكتب البريد الإلكتروني أولًا ثم اضغط استعادة كلمة المرور.','err');$('joinEmail').focus();return;}
  const btn=$('joinForgotPasswordBtn');btn.disabled=true;btn.textContent='جارٍ إرسال رابط الاستعادة...';
  try{
-  const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:'https://elmagikcool.vercel.app/app.html'});
+  const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:'https://elmagikcool.vercel.app/app.html?recovery_role=technician'});
   if(error)throw error;
   showMessage('joinMessage','تم طلب رابط استعادة كلمة المرور للبريد '+email+'. افتح الرسالة، أنشئ كلمة مرور جديدة، ثم ارجع إلى نموذج الانضمام وأكمل إرسال بياناتك وصور البطاقة.','ok');
  }catch(err){showMessage('joinMessage','تعذر إرسال رابط الاستعادة: '+(err.message||'حاول مرة أخرى بعد قليل.'),'err');}
@@ -158,49 +158,60 @@ function watchTechnicianApplications(){
    await loadManagerApplications();
   }).subscribe();
 }
-async function login(email,password,messageId){
+async function login(email,password,messageId,requestedRole){
  const {data,error}=await db.auth.signInWithPassword({email:email.trim(),password});
  if(error)throw new Error('بيانات الدخول غير صحيحة أو الحساب غير مفعل.');
  activeUser=data.user;
- const {data:admin}=await db.from('admins').select('user_id').eq('user_id',activeUser.id).maybeSingle();
- if(admin){activeRole='admin';return 'admin';}
- const {data:tech}=await db.from('technicians').select('user_id,display_name,active').eq('user_id',activeUser.id).maybeSingle();
- if(tech?.active){activeRole='technician';return 'technician';}
- await db.auth.signOut();activeUser=null;activeRole=null;throw new Error('هذا الحساب غير مسجل كمدير أو فني معتمد.');
+ if(requestedRole==='admin'){
+  const {data:admin,error:roleError}=await db.from('admins').select('user_id').eq('user_id',activeUser.id).maybeSingle();
+  if(roleError)throw roleError;
+  if(admin){activeRole='admin';localStorage.setItem('elmagik-last-role','admin');return 'admin';}
+ }else if(requestedRole==='technician'){
+  const {data:tech,error:roleError}=await db.from('technicians').select('user_id,display_name,active').eq('user_id',activeUser.id).maybeSingle();
+  if(roleError)throw roleError;
+  if(tech?.active){activeRole='technician';localStorage.setItem('elmagik-last-role','technician');return 'technician';}
+ }
+ await db.auth.signOut();activeUser=null;activeRole=null;
+ throw new Error(requestedRole==='technician'?'هذا الحساب غير مسجل كفني معتمد أو أن تفعيله غير نشط.':'هذا الحساب غير مسجل كمدير.');
 }
 // استعادة/إنشاء كلمة مرور حساب المدير الأساسي عبر رابط آمن على البريد المسجل.
 $('managerForgotBtn').addEventListener('click',async()=>{
  const btn=$('managerForgotBtn');btn.disabled=true;btn.textContent='جارٍ إرسال الرابط...';
  try{
   const email='elmagikcool@gmail.com';
-  const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:'https://elmagikcool.vercel.app/app.html'});
+  const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:'https://elmagikcool.vercel.app/app.html?recovery_role=admin'});
   if(error)throw error;
   showMessage('managerMessage','تم طلب رابط إنشاء كلمة مرور جديدة. افحص صندوق الوارد والرسائل غير المرغوب فيها للبريد '+email+'. افتح الرابط من نفس الجهاز لإكمال تعيين كلمة المرور.','ok');
  }catch(err){showMessage('managerMessage','تعذر إرسال رابط الاستعادة: '+(err.message||'حاول لاحقًا. إذا ظهر حدّ الإرسال، انتظر قليلًا قبل إعادة المحاولة.'),'err');}
  finally{btn.disabled=false;btn.textContent='إنشاء / استعادة كلمة المرور';}
 });
 let recoveryRole='unknown';
+const recoveryRoleHint=new URLSearchParams(window.location.search).get('recovery_role');
 db.auth.onAuthStateChange((event,session)=>{
  if(event==='PASSWORD_RECOVERY'&&session?.user){
   Promise.resolve().then(async()=>{
-   recoveryRole='pending';
    const uid=session.user.id;
-   const {data:admin}=await db.from('admins').select('user_id').eq('user_id',uid).maybeSingle();
-   if(admin) recoveryRole='admin';
-   else {
-    const {data:tech}=await db.from('technicians').select('user_id,active').eq('user_id',uid).maybeSingle();
-    if(tech?.active) recoveryRole='technician';
-   }
+   const [{data:admin,error:adminError},{data:tech,error:techError}]=await Promise.all([
+    db.from('admins').select('user_id').eq('user_id',uid).maybeSingle(),
+    db.from('technicians').select('user_id,active').eq('user_id',uid).maybeSingle()
+   ]);
+   if(adminError)throw adminError;
+   if(techError)throw techError;
+   const isAdmin=Boolean(admin),isTechnician=Boolean(tech?.active);
+   recoveryRole=recoveryRoleHint==='admin'&&isAdmin?'admin':recoveryRoleHint==='technician'&&isTechnician?'technician':isAdmin&&!isTechnician?'admin':isTechnician&&!isAdmin?'technician':'unknown';
    if(recoveryRole==='admin'){
     setView('manager');
     $('managerResetPanel').classList.remove('hide');
     $('managerLogin').classList.add('hide');
     showMessage('managerResetMessage','تم التحقق من رابط استعادة حساب الإدارة. أدخل كلمة المرور الجديدة.','ok');
-   }else{
+   }else if(recoveryRole==='technician'){
     setView('technician');
     $('techResetPanel').classList.remove('hide');
     $('techLogin').classList.add('hide');
-    showMessage('techResetMessage',recoveryRole==='technician'?'تم التحقق من رابط استعادة حساب الفني. أدخل كلمة المرور الجديدة.':'تم التحقق من الحساب. يمكنك تغيير كلمة المرور، لكن دخول لوحة الفني يظل متوقفًا لحين اعتماد الإدارة.','ok');
+    showMessage('techResetMessage','تم التحقق من رابط استعادة حساب الفني. أدخل كلمة المرور الجديدة.','ok');
+   }else{
+    await db.auth.signOut();
+    showMessage('techMessage','هذا الحساب له صلاحيتا المدير والفني. اطلب رابط استعادة جديدًا من بوابة الدخول المطلوبة حتى نحدد الدور الصحيح.','err');
    }
   }).catch(err=>showMessage('techMessage','تعذر تحديد نوع الحساب: '+(err.message||'حاول مرة أخرى.'),'err'));
  }
@@ -259,32 +270,36 @@ async function restoreSavedSession(){
  try{
   const {data:{session},error}=await db.auth.getSession();
   if(error||!session?.user)return;
-  activeUser=session.user;
-  const {data:admin,error:adminError}=await db.from('admins').select('user_id').eq('user_id',activeUser.id).maybeSingle();
-  if(!adminError&&admin){
-   activeRole='admin';$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');
+  const uid=session.user.id;
+  const [{data:admin,error:adminError},{data:tech,error:techError}]=await Promise.all([
+   db.from('admins').select('user_id').eq('user_id',uid).maybeSingle(),
+   db.from('technicians').select('user_id,display_name,active').eq('user_id',uid).maybeSingle()
+  ]);
+  if(adminError||techError)throw adminError||techError;
+  const isAdmin=Boolean(admin),isTechnician=Boolean(tech?.active);
+  const preferredRole=localStorage.getItem('elmagik-last-role');
+  const role=preferredRole==='admin'&&isAdmin?'admin':preferredRole==='technician'&&isTechnician?'technician':isAdmin&&!isTechnician?'admin':isTechnician&&!isAdmin?'technician':null;
+  if(!role)return;
+  activeUser=session.user;activeRole=role;
+  if(role==='admin'){
+   $('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');
    watchTechnicianApplications();
    await loadManagerOrders();await loadManagerApplications();if(window.__elmagikRefreshWorkflow)await window.__elmagikRefreshWorkflow();showMessage('managerMessage','تم استعادة جلسة الإدارة المحفوظة على هذا الجهاز.');
-   return;
-  }
-  const {data:tech,error:techError}=await db.from('technicians').select('user_id,display_name,active').eq('user_id',activeUser.id).maybeSingle();
-  if(!techError&&tech?.active){
-   activeRole='technician';$('techLogin').classList.add('hide');$('techDashboard').classList.remove('hide');
+  }else{
+   $('techLogin').classList.add('hide');$('techDashboard').classList.remove('hide');
    await loadTechOrders();showMessage('techMessage','تم استعادة جلسة الفني المحفوظة على هذا الجهاز.');
-   return;
   }
-  activeUser=null;activeRole=null;
  }catch(err){console.error('Session restore failed:',err);}
 }
 $('managerLoginBtn').addEventListener('click',async()=>{
  const btn=$('managerLoginBtn');btn.disabled=true;
- try{const role=await login($('managerEmail').value,$('managerPassword').value,'managerMessage');if(role!=='admin'){await logout();throw new Error('الحساب ليس حساب مدير.');}$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');watchTechnicianApplications();await loadManagerOrders();showMessage('managerMessage','تم تسجيل الدخول بنجاح.');await loadManagerApplications();if(window.__elmagikRefreshWorkflow)await window.__elmagikRefreshWorkflow();}
+ try{const role=await login($('managerEmail').value,$('managerPassword').value,'managerMessage','admin');if(role!=='admin'){await logout();throw new Error('الحساب ليس حساب مدير.');}$('managerLogin').classList.add('hide');$('managerDashboard').classList.remove('hide');watchTechnicianApplications();await loadManagerOrders();showMessage('managerMessage','تم تسجيل الدخول بنجاح.');await loadManagerApplications();if(window.__elmagikRefreshWorkflow)await window.__elmagikRefreshWorkflow();}
  catch(err){showMessage('managerMessage',err.message,'err');}
  finally{btn.disabled=false;}
 });
 $('techLoginBtn').addEventListener('click',async()=>{
  const btn=$('techLoginBtn');btn.disabled=true;
- try{const role=await login($('techEmail').value,$('techPassword').value,'techMessage');if(role!=='technician'){await logout();throw new Error('الحساب ليس حساب فني.');}$('techLogin').classList.add('hide');$('techDashboard').classList.remove('hide');await loadTechOrders();showMessage('techMessage','تم تسجيل الدخول بنجاح.');}
+ try{const role=await login($('techEmail').value,$('techPassword').value,'techMessage','technician');if(role!=='technician'){await logout();throw new Error('الحساب ليس حساب فني.');}$('techLogin').classList.add('hide');$('techDashboard').classList.remove('hide');await loadTechOrders();showMessage('techMessage','تم تسجيل الدخول بنجاح.');}
  catch(err){showMessage('techMessage',err.message,'err');}
  finally{btn.disabled=false;}
 });
