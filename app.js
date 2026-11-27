@@ -324,6 +324,16 @@ async function loadManagerOrders(){
  root.querySelectorAll('[data-chat-close]').forEach(b=>b.addEventListener('click',()=>closeOrderChat(b.dataset.chatClose)));
  root.querySelectorAll('[data-chat-form]').forEach(form=>form.addEventListener('submit',e=>sendOrderChatMessage(e,form.dataset.chatForm)));
 }
+const signedDocumentUrlCache=new Map();
+async function getCachedDocumentUrl(bucket,path){
+ const cached=signedDocumentUrlCache.get(path);
+ if(cached&&cached.expiresAt>Date.now()+60000)return cached.url;
+ const {data,error}=await bucket.createSignedUrl(path,3600);
+ if(error)throw error;
+ const url=data?.signedUrl||null;
+ if(url)signedDocumentUrlCache.set(path,{url,expiresAt:Date.now()+50*60*1000});
+ return url;
+}
 async function loadManagerApplications(){
  const root=$('managerApplications');if(!root)return;
  root.innerHTML='<p class="loader">جارٍ تحميل طلبات الانضمام...</p>';
@@ -342,17 +352,15 @@ async function loadManagerApplications(){
   const cards=await Promise.all(data.map(async a=>{
    let frontUrl=null,backUrl=null,frontError=null,backError=null;
    if(a.id_front_path){
-    const r=await bucket.createSignedUrl(a.id_front_path,3600);
-    if(r.error)frontError=r.error.message;else frontUrl=r.data?.signedUrl||null;
+    try{frontUrl=await getCachedDocumentUrl(bucket,a.id_front_path);}catch(r){frontError=r.message;}
    }
    if(a.id_back_path){
-    const r=await bucket.createSignedUrl(a.id_back_path,3600);
-    if(r.error)backError=r.error.message;else backUrl=r.data?.signedUrl||null;
+    try{backUrl=await getCachedDocumentUrl(bucket,a.id_back_path);}catch(r){backError=r.message;}
    }
    const imageView=(url,path,error,side)=>{
     if(!path)return '<p class="small">لم يتم رفع '+side+'</p>';
     if(!url)return '<p class="notice err">تعذر تجهيز '+side+': '+esc(error||'لم يرجع التخزين رابط الصورة')+'</p>';
-    return '<a href="'+esc(url)+'" target="_blank" rel="noopener" title="فتح '+side+' بالحجم الكامل"><img data-id-document="'+side+'" src="'+esc(url)+'" alt="'+side+'" loading="eager" style="display:block;width:min(100%,260px);height:170px;object-fit:contain;background:#f3f4f6;border:1px solid #d1d5db;border-radius:10px;padding:4px"></a><a href="'+esc(url)+'" target="_blank" rel="noopener">فتح وتكبير '+side+'</a><small class="small" data-image-status="'+side+'"></small>';
+    return '<a href="'+esc(url)+'" target="_blank" rel="noopener" title="فتح '+side+' بالحجم الكامل"><img data-id-document="'+side+'" src="'+esc(url)+'" alt="'+side+'" loading="lazy" decoding="async" fetchpriority="low" style="display:block;width:min(100%,260px);height:170px;object-fit:contain;background:#f3f4f6;border:1px solid #d1d5db;border-radius:10px;padding:4px"></a><a href="'+esc(url)+'" target="_blank" rel="noopener">فتح وتكبير '+side+'</a><small class="small" data-image-status="'+side+'"></small>';
    };
    return '<article class="order-card"><div class="order-head"><b>'+esc(a.display_name)+'</b><span class="pill">'+(a.status==='pending'?'بانتظار المراجعة':a.status==='approved'?'تم القبول':'مرفوض')+'</span></div><p>البريد: '+esc(a.email)+'<br>الهاتف: '+esc(a.phone)+'<br>المحافظة: '+esc(a.governorate)+' – '+esc(a.area)+'</p><p>الخبرة: '+esc(a.years_experience)+' سنة<br>التخصصات: '+esc((a.specialties||[]).join('، '))+'</p><p>نبذة: '+esc(a.notes||'لا توجد نبذة')+'</p><div style="margin:12px 0"><b>صور بطاقة الرقم القومي</b><div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px"><div style="display:grid;gap:6px;min-width:140px"><b>الوجه الأمامي</b>'+imageView(frontUrl,a.id_front_path,frontError,'الوجه الأمامي')+'</div><div style="display:grid;gap:6px;min-width:140px"><b>الوجه الخلفي</b>'+imageView(backUrl,a.id_back_path,backError,'الوجه الخلفي')+'</div></div></div>'+(a.status==='pending'?'<div class="order-actions"><button class="btn green" type="button" data-approve-tech="'+esc(a.id)+'">قبول وتفعيل الفني</button><button class="btn alt" type="button" data-reject-tech="'+esc(a.id)+'">رفض الطلب</button></div>':'')+'</article>';
   }));
