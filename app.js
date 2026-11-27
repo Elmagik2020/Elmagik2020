@@ -142,6 +142,7 @@ $('joinForgotPasswordBtn').addEventListener('click',async()=>{
  if(!email){showMessage('joinMessage','اكتب البريد الإلكتروني أولًا ثم اضغط استعادة كلمة المرور.','err');$('joinEmail').focus();return;}
  const btn=$('joinForgotPasswordBtn');btn.disabled=true;btn.textContent='جارٍ إرسال رابط الاستعادة...';
  try{
+  localStorage.setItem('elmagik-recovery-role','technician');
   const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:'https://elmagikcool.vercel.app/app.html?recovery_role=technician'});
   if(error)throw error;
   showMessage('joinMessage','تم طلب رابط استعادة كلمة المرور للبريد '+email+'. افتح الرسالة، أنشئ كلمة مرور جديدة، ثم ارجع إلى نموذج الانضمام وأكمل إرسال بياناتك وصور البطاقة.','ok');
@@ -179,6 +180,7 @@ $('managerForgotBtn').addEventListener('click',async()=>{
  const btn=$('managerForgotBtn');btn.disabled=true;btn.textContent='جارٍ إرسال الرابط...';
  try{
   const email='elmagikcool@gmail.com';
+  localStorage.setItem('elmagik-recovery-role','admin');
   const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:'https://elmagikcool.vercel.app/app.html?recovery_role=admin'});
   if(error)throw error;
   showMessage('managerMessage','تم طلب رابط إنشاء كلمة مرور جديدة. افحص صندوق الوارد والرسائل غير المرغوب فيها للبريد '+email+'. افتح الرابط من نفس الجهاز لإكمال تعيين كلمة المرور.','ok');
@@ -186,7 +188,7 @@ $('managerForgotBtn').addEventListener('click',async()=>{
  finally{btn.disabled=false;btn.textContent='إنشاء / استعادة كلمة المرور';}
 });
 let recoveryRole='unknown';
-const recoveryRoleHint=new URLSearchParams(window.location.search).get('recovery_role');
+const recoveryRoleHint=new URLSearchParams(window.location.search).get('recovery_role')||localStorage.getItem('elmagik-recovery-role');
 db.auth.onAuthStateChange((event,session)=>{
  if(event==='PASSWORD_RECOVERY'&&session?.user){
   Promise.resolve().then(async()=>{
@@ -227,6 +229,8 @@ async function saveRecoveryPassword(formId,newId,confirmId,buttonId,messageId){
   const {error:updateError}=await db.auth.updateUser({password});
   if(updateError)throw updateError;
   await db.auth.signOut();
+  localStorage.setItem('elmagik-last-role',recoveryRole);
+  localStorage.removeItem('elmagik-recovery-role');
   $(formId).reset();
   if(recoveryRole==='admin'){
    $('managerResetPanel').classList.add('hide');$('managerLogin').classList.remove('hide');
